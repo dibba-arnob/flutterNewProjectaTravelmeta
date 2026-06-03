@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'search_screen.dart';
+import '../theme/app_colors.dart';
+
+import 'service_screens.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -105,12 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHomeSearchBar() {
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const SearchScreen()),
-      ),
-      child: Container(
+    return Container(
         height: 54,
         decoration: BoxDecoration(
           color: Colors.white,
@@ -159,7 +156,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-      ),
     );
   }
 
@@ -177,6 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
               (i) => _ServiceTile(
                 icon: _services[i].$1,
                 label: _services[i].$2,
+                onTap: () => ServiceNav.navigateTo(context, i),
               ),
             ),
           ),
@@ -188,6 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
               (i) => _ServiceTile(
                 icon: _services[i + 4].$1,
                 label: _services[i + 4].$2,
+                onTap: () => ServiceNav.navigateTo(context, i + 4),
               ),
             ),
           ),
@@ -587,42 +585,46 @@ class _HomeScreenState extends State<HomeScreen> {
 class _ServiceTile extends StatelessWidget {
   final IconData icon;
   final String label;
+  final VoidCallback? onTap;
 
-  const _ServiceTile({required this.icon, required this.label});
+  const _ServiceTile({
+    required this.icon,
+    required this.label,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {},
-      child: SizedBox(
-        width: 72,
-        child: Column(
-          children: [
-            Container(
-              width: 54,
-              height: 54,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE0F2FE),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(
-                icon,
-                size: 26,
-                color: const Color(0xFF0891B2),
+    return SizedBox(
+      width: 72,
+      child: Column(
+        children: [
+          Material(
+            color: AppColors.secondary.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(16),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onTap,
+              splashColor: AppColors.secondary.withValues(alpha: 0.20),
+              highlightColor: AppColors.secondary.withValues(alpha: 0.10),
+              child: SizedBox(
+                width: 54,
+                height: 54,
+                child: Icon(icon, size: 26, color: AppColors.secondary),
               ),
             ),
-            const SizedBox(height: 7),
-            Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF334155),
-              ),
-              textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 7),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
             ),
-          ],
-        ),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }

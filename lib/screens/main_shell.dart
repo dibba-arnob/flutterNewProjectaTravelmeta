@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_text_styles.dart';
+import '../widgets/shared_chrome.dart';
 import 'home_screen.dart';
 
 class MainShell extends StatefulWidget {
@@ -33,10 +35,11 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
-      appBar: const _TmAppBar(),
+      backgroundColor: AppColors.surfaceLight,
+      // No leading override → shows the gradient logo circle
+      appBar: const TmAppBar(),
       body: IndexedStack(index: _idx, children: _pages),
-      bottomNavigationBar: _TmBottomNav(
+      bottomNavigationBar: TmBottomNav(
         currentIndex: _idx,
         onTap: (i) => setState(() => _idx = i),
       ),
@@ -44,7 +47,7 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
-// ─── Placeholder pages ────────────────────────────────────────────────────────
+// ─── Placeholder pages (Explore, Bookings, Community, Profile) ────────────────
 
 class _PlaceholderPage extends StatelessWidget {
   final String name;
@@ -62,233 +65,25 @@ class _PlaceholderPage extends StatelessWidget {
             width: 72,
             height: 72,
             decoration: BoxDecoration(
-              color: const Color(0xFFE0F2FE),
+              color: AppColors.secondary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: Icon(icon, size: 34, color: const Color(0xFF0891B2)),
+            child: Icon(icon, size: 34, color: AppColors.secondary),
           ),
           const SizedBox(height: 16),
           Text(
             name,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF0A2540),
+            style: AppTextStyles.h4.copyWith(
+              color: AppColors.primary,
               letterSpacing: -0.3,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             'Coming soon',
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: const Color(0xFF64748B),
-            ),
+            style: AppTextStyles.body.copyWith(color: AppColors.textMuted),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ─── Shared App Bar ───────────────────────────────────────────────────────────
-
-class _TmAppBar extends StatelessWidget implements PreferredSizeWidget {
-  const _TmAppBar();
-
-  @override
-  Size get preferredSize => const Size.fromHeight(64);
-
-  @override
-  Widget build(BuildContext context) {
-    return AppBar(
-      backgroundColor: Colors.white,
-      elevation: 0,
-      shadowColor: Colors.transparent,
-      surfaceTintColor: Colors.white,
-      titleSpacing: 0,
-      automaticallyImplyLeading: false,
-      leading: Padding(
-        padding: const EdgeInsets.only(left: 16, top: 12, bottom: 12),
-        child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF0891B2), Color(0xFF0A2540)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.flight_takeoff_rounded,
-            color: Colors.white,
-            size: 20,
-          ),
-        ),
-      ),
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            'TravelMeta',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF0A2540),
-              letterSpacing: -0.3,
-            ),
-          ),
-          Row(
-            children: [
-              const Icon(
-                Icons.location_on_rounded,
-                size: 11,
-                color: Color(0xFF0891B2),
-              ),
-              const SizedBox(width: 2),
-              Text(
-                'DHAKA, BANGLADESH',
-                style: GoogleFonts.inter(
-                  fontSize: 10,
-                  color: const Color(0xFF64748B),
-                  letterSpacing: 0.6,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      actions: [
-        Padding(
-          padding: const EdgeInsets.only(right: 16),
-          child: Stack(
-            alignment: Alignment.center,
-            clipBehavior: Clip.none,
-            children: [
-              GestureDetector(
-                onTap: () {},
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF1F5F9),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.notifications_outlined,
-                    color: Color(0xFF0A2540),
-                    size: 22,
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 6,
-                right: 5,
-                child: Container(
-                  width: 9,
-                  height: 9,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEF4444),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 1.5),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(1),
-        child: Container(height: 1, color: const Color(0xFFF1F5F9)),
-      ),
-    );
-  }
-}
-
-// ─── Shared Bottom Nav ────────────────────────────────────────────────────────
-
-class _TmBottomNav extends StatelessWidget {
-  final int currentIndex;
-  final ValueChanged<int> onTap;
-
-  const _TmBottomNav({required this.currentIndex, required this.onTap});
-
-  static const _items = [
-    (Icons.home_rounded, Icons.home_outlined, 'Home'),
-    (Icons.explore, Icons.explore_outlined, 'Explore'),
-    (Icons.event_note, Icons.event_note_outlined, 'Bookings'),
-    (Icons.people, Icons.people_outline, 'Community'),
-    (Icons.person, Icons.person_outline, 'Profile'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x18000000),
-            blurRadius: 24,
-            offset: Offset(0, -6),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 62,
-          child: Row(
-            children: List.generate(_items.length, (i) {
-              final active = i == currentIndex;
-              final (filledIcon, outlineIcon, label) = _items[i];
-              return Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => onTap(i),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        active ? filledIcon : outlineIcon,
-                        size: 23,
-                        color: active
-                            ? const Color(0xFF0A2540)
-                            : const Color(0xFF94A3B8),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        label,
-                        style: GoogleFonts.inter(
-                          fontSize: 10,
-                          fontWeight:
-                              active ? FontWeight.w700 : FontWeight.w400,
-                          color: active
-                              ? const Color(0xFF0A2540)
-                              : const Color(0xFF94A3B8),
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Container(
-                        width: 4,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: active
-                              ? const Color(0xFF0891B2)
-                              : Colors.transparent,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-          ),
-        ),
       ),
     );
   }
