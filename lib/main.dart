@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
 import 'screens/main_shell.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: 'https://hjggxlmsuxbdagvzwtys.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqZ2d4bG1zdXhiZGFndnp3dHlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1OTY0OTksImV4cCI6MjA5NjE3MjQ5OX0.KV929XuxcxiEcgNm99v5YJiHxSkv_KfUghIkvdAYYfA',
+  );
 
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
