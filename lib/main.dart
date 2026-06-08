@@ -10,7 +10,7 @@ void main() async {
 
   await Supabase.initialize(
     url: 'https://hjggxlmsuxbdagvzwtys.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqZ2d4bG1zdXhiZGFndnp3dHlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1OTY0OTksImV4cCI6MjA5NjE3MjQ5OX0.KV929XuxcxiEcgNm99v5YJiHxSkv_KfUghIkvdAYYfA',
+    publishableKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqZ2d4bG1zdXhiZGFndnp3dHlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1OTY0OTksImV4cCI6MjA5NjE3MjQ5OX0.KV929XuxcxiEcgNm99v5YJiHxSkv_KfUghIkvdAYYfA',
   );
 
   await SystemChrome.setPreferredOrientations([

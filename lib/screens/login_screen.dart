@@ -1,8 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/supabase_service.dart';
 import '../theme/app_colors.dart';
 import 'register_screen.dart';
+import 'otp_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -50,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen>
     super.dispose();
   }
 
-  // ─── Auth actions (wire to Supabase here) ──────────────────────────────────
+  // ─── Auth actions ───────────────────────────────────────────────────────────
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
@@ -58,56 +61,78 @@ class _LoginScreenState extends State<LoginScreen>
 
     try {
       if (_tab == 0) {
-        // EMAIL LOGIN
-        // ────────────────────────────────────────────────────────────────
-        // final res = await Supabase.instance.client.auth.signInWithPassword(
-        //   email: _emailController.text.trim(),
-        //   password: _passwordController.text,
-        // );
-        // if (res.user == null) throw Exception('Login failed');
-        // ────────────────────────────────────────────────────────────────
-        await Future.delayed(const Duration(milliseconds: 1200)); // remove later
-      } else {
-        // PHONE OTP — Supabase sends an SMS code; navigate to OTP verify screen
-        // ────────────────────────────────────────────────────────────────
-        // await Supabase.instance.client.auth.signInWithOtp(
-        //   phone: _phoneController.text.trim(),
-        // );
-        // if (mounted) Navigator.pushNamed(context, '/otp-verify');
-        // ────────────────────────────────────────────────────────────────
-        await Future.delayed(const Duration(milliseconds: 1200));
-      }
-
-      if (mounted) Navigator.pushReplacementNamed(context, '/home');
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
+        // Email + password login
+        await supabase.auth.signInWithPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
         );
+        if (mounted) Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        // Phone OTP — sends SMS, then go to OTP screen
+        final phone = _phoneController.text.trim();
+        await supabase.auth.signInWithOtp(phone: phone);
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => OtpScreen(phone: phone)),
+          );
+        }
       }
+    } on AuthException catch (e) {
+      if (mounted) _showError(_friendlyAuthError(e.message));
+    } catch (_) {
+      if (mounted) _showError('Something went wrong. Please try again.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _googleSignIn() async {
-    // GOOGLE OAUTH
-    // ────────────────────────────────────────────────────────────────
-    // await Supabase.instance.client.auth.signInWithOAuth(
-    //   OAuthProvider.google,
-    //   redirectTo: 'io.supabase.travelmeta://login-callback',
-    // );
-    // ────────────────────────────────────────────────────────────────
+  Future<void> _forgotPassword() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      _showError('Enter your email address first, then tap Forgot Password.');
+      return;
+    }
+    if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email)) {
+      _showError('Enter a valid email address.');
+      return;
+    }
+    try {
+      await supabase.auth.resetPasswordForEmail(email);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Password reset link sent to $email'),
+            backgroundColor: Colors.green.shade700,
+          ),
+        );
+      }
+    } on AuthException catch (e) {
+      if (mounted) _showError(_friendlyAuthError(e.message));
+    }
   }
 
-  Future<void> _forgotPassword() async {
-    // PASSWORD RESET
-    // ────────────────────────────────────────────────────────────────
-    // await Supabase.instance.client.auth.resetPasswordForEmail(
-    //   _emailController.text.trim(),
-    //   redirectTo: 'io.supabase.travelmeta://reset-password',
-    // );
-    // ────────────────────────────────────────────────────────────────
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: AppColors.error),
+    );
+  }
+
+  String _friendlyAuthError(String raw) {
+    final msg = raw.toLowerCase();
+    if (msg.contains('invalid login') || msg.contains('invalid credentials')) {
+      return 'Wrong email or password.';
+    }
+    if (msg.contains('email not confirmed')) {
+      return 'Please verify your email before signing in.';
+    }
+    if (msg.contains('too many requests')) {
+      return 'Too many attempts. Please wait a moment.';
+    }
+    if (msg.contains('user not found')) {
+      return 'No account found with this email.';
+    }
+    return raw;
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -159,7 +184,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ─── Top bar ───────────────────────────────────────────────────────────────
+  // ─── Top bar ────────────────────────────────────────────────────────────────
 
   Widget _buildTopBar() {
     return Padding(
@@ -175,21 +200,18 @@ class _LoginScreenState extends State<LoginScreen>
               color: Colors.white,
             ),
           ),
-          GestureDetector(
-            onTap: () {},
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.12),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
-              ),
-              child: Icon(
-                Icons.help_outline_rounded,
-                color: Colors.white.withValues(alpha: 0.80),
-                size: 18,
-              ),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withValues(alpha: 0.12),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
+            ),
+            child: Icon(
+              Icons.help_outline_rounded,
+              color: Colors.white.withValues(alpha: 0.80),
+              size: 18,
             ),
           ),
         ],
@@ -197,7 +219,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ─── Header ────────────────────────────────────────────────────────────────
+  // ─── Header ─────────────────────────────────────────────────────────────────
 
   Widget _buildHeader() {
     return Column(
@@ -226,7 +248,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ─── Glass card ────────────────────────────────────────────────────────────
+  // ─── Glass card ─────────────────────────────────────────────────────────────
 
   Widget _buildCard() {
     return ClipRRect(
@@ -246,43 +268,80 @@ class _LoginScreenState extends State<LoginScreen>
               children: [
                 _buildTabs(),
                 const SizedBox(height: 22),
+                // Email tab: email + password fields
+                // Phone tab: phone field + OTP hint (no password)
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 220),
                   transitionBuilder: (child, anim) =>
                       FadeTransition(opacity: anim, child: child),
                   child: _tab == 0
-                      ? _buildField(
-                          key: const ValueKey('email'),
-                          controller: _emailController,
-                          hint: 'Email Address',
-                          icon: Icons.email_outlined,
-                          type: TextInputType.emailAddress,
-                          validator: (v) {
-                            if (v == null || v.isEmpty) return 'Enter your email';
-                            if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v)) {
-                              return 'Enter a valid email';
-                            }
-                            return null;
-                          },
+                      ? Column(
+                          key: const ValueKey('email_tab'),
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildField(
+                              controller: _emailController,
+                              hint: 'Email Address',
+                              icon: Icons.email_outlined,
+                              type: TextInputType.emailAddress,
+                              validator: (v) {
+                                if (v == null || v.isEmpty) {
+                                  return 'Enter your email';
+                                }
+                                if (!RegExp(r'^[^@]+@[^@]+\.[^@]+')
+                                    .hasMatch(v)) {
+                                  return 'Enter a valid email';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 14),
+                            _buildPasswordField(),
+                            const SizedBox(height: 18),
+                            _buildForgotRow(),
+                          ],
                         )
-                      : _buildField(
-                          key: const ValueKey('phone'),
-                          controller: _phoneController,
-                          hint: 'Phone Number',
-                          icon: Icons.phone_outlined,
-                          type: TextInputType.phone,
-                          validator: (v) {
-                            if (v == null || v.isEmpty) {
-                              return 'Enter your phone number';
-                            }
-                            return null;
-                          },
+                      : Column(
+                          key: const ValueKey('phone_tab'),
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildField(
+                              controller: _phoneController,
+                              hint: 'Phone (e.g. +8801XXXXXXXXX)',
+                              icon: Icons.phone_outlined,
+                              type: TextInputType.phone,
+                              validator: (v) {
+                                if (v == null || v.isEmpty) {
+                                  return 'Enter your phone number';
+                                }
+                                if (!v.startsWith('+')) {
+                                  return 'Include country code (e.g. +880...)';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Icon(Icons.info_outline_rounded,
+                                    size: 14,
+                                    color:
+                                        Colors.white.withValues(alpha: 0.40)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'A verification code will be sent via SMS',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color:
+                                        Colors.white.withValues(alpha: 0.45),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                          ],
                         ),
                 ),
-                const SizedBox(height: 14),
-                _buildPasswordField(),
-                const SizedBox(height: 18),
-                _buildForgotRow(),
                 const SizedBox(height: 22),
                 _buildLoginButton(),
               ],
@@ -293,7 +352,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ─── Email / Phone tabs ────────────────────────────────────────────────────
+  // ─── Email / Phone tabs ──────────────────────────────────────────────────────
 
   Widget _buildTabs() {
     return Container(
@@ -319,10 +378,9 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ─── Shared input field ────────────────────────────────────────────────────
+  // ─── Input fields ────────────────────────────────────────────────────────────
 
   Widget _buildField({
-    required Key key,
     required TextEditingController controller,
     required String hint,
     required IconData icon,
@@ -330,7 +388,6 @@ class _LoginScreenState extends State<LoginScreen>
     required String? Function(String?) validator,
   }) {
     return TextFormField(
-      key: key,
       controller: controller,
       keyboardType: type,
       style: GoogleFonts.inter(fontSize: 14, color: Colors.white),
@@ -346,11 +403,14 @@ class _LoginScreenState extends State<LoginScreen>
       obscureText: _obscure,
       style: GoogleFonts.inter(fontSize: 14, color: Colors.white),
       cursorColor: AppColors.accent,
-      decoration: _fieldDecoration('Password', Icons.lock_outline_rounded).copyWith(
+      decoration:
+          _fieldDecoration('Password', Icons.lock_outline_rounded).copyWith(
         suffixIcon: GestureDetector(
           onTap: () => setState(() => _obscure = !_obscure),
           child: Icon(
-            _obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+            _obscure
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
             color: Colors.white.withValues(alpha: 0.45),
             size: 20,
           ),
@@ -371,10 +431,12 @@ class _LoginScreenState extends State<LoginScreen>
         fontSize: 14,
         color: Colors.white.withValues(alpha: 0.35),
       ),
-      prefixIcon: Icon(icon, color: Colors.white.withValues(alpha: 0.40), size: 20),
+      prefixIcon:
+          Icon(icon, color: Colors.white.withValues(alpha: 0.40), size: 20),
       filled: true,
       fillColor: Colors.white.withValues(alpha: 0.07),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.14)),
@@ -395,7 +457,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ─── Forgot / Biometric row ────────────────────────────────────────────────
+  // ─── Forgot / Biometric row ──────────────────────────────────────────────────
 
   Widget _buildForgotRow() {
     return Row(
@@ -412,35 +474,31 @@ class _LoginScreenState extends State<LoginScreen>
             ),
           ),
         ),
-        GestureDetector(
-          onTap: () {
-            // local_auth biometric + restore Supabase session
-          },
-          child: Row(
-            children: [
-              Icon(
-                Icons.fingerprint_rounded,
-                color: Colors.white.withValues(alpha: 0.55),
-                size: 20,
+        Row(
+          children: [
+            Icon(
+              Icons.fingerprint_rounded,
+              color: Colors.white.withValues(alpha: 0.35),
+              size: 20,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'Biometric',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: Colors.white.withValues(alpha: 0.35),
               ),
-              const SizedBox(width: 6),
-              Text(
-                'Biometric',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: Colors.white.withValues(alpha: 0.55),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ],
     );
   }
 
-  // ─── Login button ──────────────────────────────────────────────────────────
+  // ─── Login button ────────────────────────────────────────────────────────────
 
   Widget _buildLoginButton() {
+    final label = _tab == 0 ? 'Login' : 'Send Code';
     return Container(
       height: 52,
       decoration: BoxDecoration(
@@ -476,7 +534,7 @@ class _LoginScreenState extends State<LoginScreen>
                     ),
                   )
                 : Text(
-                    'Login',
+                    label,
                     style: GoogleFonts.inter(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
@@ -490,7 +548,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ─── Divider ───────────────────────────────────────────────────────────────
+  // ─── Divider ─────────────────────────────────────────────────────────────────
 
   Widget _buildDivider() {
     return Row(
@@ -523,35 +581,36 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ─── Social buttons ────────────────────────────────────────────────────────
+  // ─── Social buttons ───────────────────────────────────────────────────────────
 
   Widget _buildSocials() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _SocialBtn(
-          onTap: _googleSignIn,
+          onTap: () {
+            // Google OAuth — enable in Supabase dashboard first
+            // supabase.auth.signInWithOAuth(OAuthProvider.google)
+          },
           child: const _GoogleIcon(),
         ),
         const SizedBox(width: 16),
         _SocialBtn(
-          onTap: () {
-            // Supabase.instance.client.auth.signInWithOAuth(OAuthProvider.facebook)
-          },
-          child: const Icon(Icons.facebook_rounded, color: Colors.white, size: 26),
+          onTap: () {},
+          child: const Icon(Icons.facebook_rounded,
+              color: Colors.white, size: 26),
         ),
         const SizedBox(width: 16),
         _SocialBtn(
-          onTap: () {
-            // Supabase.instance.client.auth.signInWithOAuth(OAuthProvider.apple)
-          },
-          child: const Icon(Icons.apple_rounded, color: Colors.white, size: 26),
+          onTap: () {},
+          child: const Icon(Icons.apple_rounded,
+              color: Colors.white, size: 26),
         ),
       ],
     );
   }
 
-  // ─── Sign-up row ───────────────────────────────────────────────────────────
+  // ─── Sign-up row ──────────────────────────────────────────────────────────────
 
   Widget _buildSignUpRow() {
     return Center(
@@ -569,8 +628,7 @@ class _LoginScreenState extends State<LoginScreen>
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const RegisterScreen(),
-                  ),
+                      builder: (_) => const RegisterScreen()),
                 ),
                 child: Text(
                   'Join TravelMeta',
@@ -596,11 +654,8 @@ class _TabPill extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  const _TabPill({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
+  const _TabPill(
+      {required this.label, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -653,7 +708,8 @@ class _SocialBtn extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.09),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+              border:
+                  Border.all(color: Colors.white.withValues(alpha: 0.16)),
             ),
             alignment: Alignment.center,
             child: child,
@@ -669,7 +725,6 @@ class _GoogleIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Simple "G" — replace with flutter_svg + Google's official SVG if preferred
     return Text(
       'G',
       style: GoogleFonts.inter(
@@ -680,8 +735,6 @@ class _GoogleIcon extends StatelessWidget {
     );
   }
 }
-
-// ─── Background (shared coastal style with SplashScreen) ──────────────────────
 
 class _Background extends StatelessWidget {
   const _Background();
@@ -720,9 +773,9 @@ class _Overlay extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Color(0x1F000000), // 0.12 opacity black
-            Color(0x47000000), // 0.28 opacity black
-            Color(0x8C000000), // 0.55 opacity black
+            Color(0x1F000000),
+            Color(0x47000000),
+            Color(0x8C000000),
           ],
           stops: [0.0, 0.45, 1.0],
         ),

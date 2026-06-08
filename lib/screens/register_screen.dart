@@ -2,6 +2,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/supabase_service.dart';
 import '../theme/app_colors.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -21,6 +23,10 @@ class _RegisterScreenState extends State<RegisterScreen>
   final _phoneController = TextEditingController();
   final _passportController = TextEditingController();
   final _ageController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  bool _obscurePass = true;
+  bool _obscureConfirm = true;
 
   // selections
   String? _country;
@@ -56,10 +62,27 @@ class _RegisterScreenState extends State<RegisterScreen>
     _phoneController.dispose();
     _passportController.dispose();
     _ageController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  // ─── Auth action (wire Supabase here) ──────────────────────────────────────
+  // ─── Gender → Supabase enum mapping ────────────────────────────────────────
+
+  String _genderEnum(String display) {
+    switch (display) {
+      case 'Male':
+        return 'male';
+      case 'Female':
+        return 'female';
+      case 'Non-binary':
+        return 'other';
+      default:
+        return 'prefer_not_to_say';
+    }
+  }
+
+  // ─── Auth action ────────────────────────────────────────────────────────────
 
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
@@ -78,30 +101,55 @@ class _RegisterScreenState extends State<RegisterScreen>
 
     setState(() => _loading = true);
     try {
-      // SUPABASE SIGN-UP
-      // ──────────────────────────────────────────────────────────────────
-      // final res = await Supabase.instance.client.auth.signUp(
-      //   email: _emailController.text.trim(),
-      //   password: 'generated-or-user-provided',   // add a password field if needed
-      //   data: {
-      //     'full_name':    _nameController.text.trim(),
-      //     'phone':        _phoneController.text.trim(),
-      //     'passport_id':  _passportController.text.trim(),
-      //     'country':      _country,
-      //     'gender':       _gender,
-      //     'age':          int.tryParse(_ageController.text) ?? 0,
-      //     'blood_group':  _bloodGroup,
-      //   },
-      // );
-      // ──────────────────────────────────────────────────────────────────
+      final response = await supabase.auth.signUp(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        data: {
+          'full_name': _nameController.text.trim(),
+          'phone': _phoneController.text.trim(),
+          'nationality': _country,
+          'home_country': _country,
+          'gender': _genderEnum(_gender!),
+          'blood_group': _bloodGroup,
+          'passport_number': _passportController.text.trim(),
+        },
+      );
 
-      await Future.delayed(const Duration(milliseconds: 1400)); // remove later
-      if (mounted) Navigator.pushReplacementNamed(context, '/home');
-    } catch (e) {
-      if (mounted) _showError(e.toString());
+      if (!mounted) return;
+
+      if (response.session != null) {
+        // Email confirmation disabled — user is immediately signed in
+        Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        // Email confirmation required — tell the user to check their inbox
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Account created! Check your email (${_emailController.text.trim()}) to verify before signing in.',
+            ),
+            duration: const Duration(seconds: 6),
+            backgroundColor: Colors.green.shade700,
+          ),
+        );
+        Navigator.pop(context); // back to login
+      }
+    } on AuthException catch (e) {
+      if (mounted) _showError(_friendlyError(e.message));
+    } catch (_) {
+      if (mounted) _showError('Registration failed. Please try again.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  String _friendlyError(String raw) {
+    final msg = raw.toLowerCase();
+    if (msg.contains('already registered') || msg.contains('already exists')) {
+      return 'An account with this email already exists.';
+    }
+    if (msg.contains('password')) return 'Password must be at least 6 characters.';
+    if (msg.contains('email')) return 'Enter a valid email address.';
+    return raw;
   }
 
   void _showError(String msg) {
@@ -330,6 +378,40 @@ class _RegisterScreenState extends State<RegisterScreen>
                 const SizedBox(height: 12),
                 _buildCountryField(),
 
+                const SizedBox(height: 20),
+                _dividerLine(),
+                const SizedBox(height: 16),
+
+                // ── Security ───────────────────────────────
+                _sectionLabel('Security'),
+                const SizedBox(height: 14),
+                _buildPasswordField(
+                  controller: _passwordController,
+                  hint: 'Password',
+                  obscure: _obscurePass,
+                  onToggle: () => setState(() => _obscurePass = !_obscurePass),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Enter a password';
+                    if (v.length < 6) return 'Minimum 6 characters';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                _buildPasswordField(
+                  controller: _confirmPasswordController,
+                  hint: 'Confirm Password',
+                  obscure: _obscureConfirm,
+                  onToggle: () =>
+                      setState(() => _obscureConfirm = !_obscureConfirm),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Confirm your password';
+                    if (v != _passwordController.text) {
+                      return 'Passwords do not match';
+                    }
+                    return null;
+                  },
+                ),
+
                 const SizedBox(height: 24),
                 _buildRegisterButton(),
               ],
@@ -380,6 +462,34 @@ class _RegisterScreenState extends State<RegisterScreen>
       style: GoogleFonts.inter(fontSize: 14, color: Colors.white),
       cursorColor: AppColors.accent,
       decoration: _dec(hint, icon),
+      validator: validator,
+    );
+  }
+
+  // ─── Password field ────────────────────────────────────────────────────────
+
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required String hint,
+    required bool obscure,
+    required VoidCallback onToggle,
+    required String? Function(String?) validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: obscure,
+      style: GoogleFonts.inter(fontSize: 14, color: Colors.white),
+      cursorColor: AppColors.accent,
+      decoration: _dec(hint, Icons.lock_outline_rounded).copyWith(
+        suffixIcon: GestureDetector(
+          onTap: onToggle,
+          child: Icon(
+            obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+            color: Colors.white.withValues(alpha: 0.45),
+            size: 20,
+          ),
+        ),
+      ),
       validator: validator,
     );
   }

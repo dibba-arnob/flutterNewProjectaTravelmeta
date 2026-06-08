@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -61,11 +62,19 @@ class _SplashScreenState extends State<SplashScreen>
 
   void _navigateToLogin() {
     if (!mounted) return;
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session != null) {
+      // Already authenticated — go straight to home
+      Navigator.of(context).pushReplacementNamed('/home');
+      return;
+    }
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => const LoginScreen(),
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            const LoginScreen(),
         transitionDuration: const Duration(milliseconds: 600),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) => FadeTransition(
+        transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+            FadeTransition(
           opacity: CurvedAnimation(parent: animation, curve: Curves.easeIn),
           child: child,
         ),

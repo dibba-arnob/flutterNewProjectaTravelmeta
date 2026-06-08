@@ -85,6 +85,8 @@ class SvSwapRow extends StatelessWidget {
   final IconData fromIcon;
   final IconData toIcon;
   final VoidCallback onSwap;
+  final VoidCallback? onTapFrom;
+  final VoidCallback? onTapTo;
   const SvSwapRow({
     super.key,
     required this.from,
@@ -92,6 +94,8 @@ class SvSwapRow extends StatelessWidget {
     required this.fromIcon,
     required this.toIcon,
     required this.onSwap,
+    this.onTapFrom,
+    this.onTapTo,
   });
 
   @override
@@ -103,23 +107,26 @@ class SvSwapRow extends StatelessWidget {
         child: Row(
           children: [
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Icon(fromIcon, size: 13, color: AppColors.secondary),
-                      const SizedBox(width: 4),
-                      Text('From', style: AppTextStyles.caption.copyWith(fontSize: 11)),
-                    ]),
-                    const SizedBox(height: 4),
-                    Text(
-                      from,
-                      style: AppTextStyles.label.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+              child: GestureDetector(
+                onTap: onTapFrom,
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        Icon(fromIcon, size: 13, color: AppColors.secondary),
+                        const SizedBox(width: 4),
+                        Text('From', style: AppTextStyles.caption.copyWith(fontSize: 11)),
+                      ]),
+                      const SizedBox(height: 4),
+                      Text(
+                        from,
+                        style: AppTextStyles.label.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -136,24 +143,27 @@ class SvSwapRow extends StatelessWidget {
               ),
             ),
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-                      Text('To', style: AppTextStyles.caption.copyWith(fontSize: 11)),
-                      const SizedBox(width: 4),
-                      Icon(toIcon, size: 13, color: AppColors.secondary),
-                    ]),
-                    const SizedBox(height: 4),
-                    Text(
-                      to,
-                      style: AppTextStyles.label.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700),
-                      textAlign: TextAlign.end,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+              child: GestureDetector(
+                onTap: onTapTo,
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                        Text('To', style: AppTextStyles.caption.copyWith(fontSize: 11)),
+                        const SizedBox(width: 4),
+                        Icon(toIcon, size: 13, color: AppColors.secondary),
+                      ]),
+                      const SizedBox(height: 4),
+                      Text(
+                        to,
+                        style: AppTextStyles.label.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700),
+                        textAlign: TextAlign.end,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -168,30 +178,34 @@ class SvField extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
-  const SvField({super.key, required this.label, required this.value, required this.icon});
+  final VoidCallback? onTap;
+  const SvField({super.key, required this.label, required this.value, required this.icon, this.onTap});
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          border: Border.all(color: AppColors.borderLight),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(children: [
-          Icon(icon, size: 15, color: AppColors.secondary),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(label, style: AppTextStyles.caption.copyWith(fontSize: 10)),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: AppTextStyles.label.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 12),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ]),
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.borderLight),
+            borderRadius: BorderRadius.circular(12),
           ),
-        ]),
+          child: Row(children: [
+            Icon(icon, size: 15, color: AppColors.secondary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(label, style: AppTextStyles.caption.copyWith(fontSize: 10)),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: AppTextStyles.label.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 12),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ]),
+            ),
+          ]),
+        ),
       );
 }
 

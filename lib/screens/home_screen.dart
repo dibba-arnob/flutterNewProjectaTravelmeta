@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_colors.dart';
-
+import '../theme/app_spacing.dart';
 import 'service_screens.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -55,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildWelcomeSection(),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.xl),
           _buildServicesGrid(),
           const SizedBox(height: 22),
           _buildFlashDeal(),
@@ -76,7 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildWelcomeSection() {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -85,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
             style: GoogleFonts.inter(
               fontSize: 11,
               fontWeight: FontWeight.w700,
-              color: const Color(0xFF0891B2),
+              color: AppColors.secondary,
               letterSpacing: 2.0,
             ),
           ),
@@ -95,11 +95,11 @@ class _HomeScreenState extends State<HomeScreen> {
             style: GoogleFonts.plusJakartaSans(
               fontSize: 28,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFF0A2540),
+              color: AppColors.primary,
               letterSpacing: -0.5,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.xl),
           _buildHomeSearchBar(),
         ],
       ),
@@ -108,54 +108,54 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildHomeSearchBar() {
     return Container(
-        height: 54,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x100A2540),
-              blurRadius: 16,
-              offset: Offset(0, 4),
+      height: 54,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.borderLight),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x100A2540),
+            blurRadius: 16,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+            child: Icon(
+              Icons.search_rounded,
+              color: Color(0xFF94A3B8),
+              size: 22,
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Icon(
-                Icons.search_rounded,
-                color: Color(0xFF94A3B8),
-                size: 22,
+          ),
+          Expanded(
+            child: Text(
+              'Search destinations, hotels, flights...',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: const Color(0xFFB0BFCC),
               ),
             ),
-            Expanded(
-              child: Text(
-                'Search destinations, hotels, flights...',
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  color: const Color(0xFFB0BFCC),
-                ),
-              ),
+          ),
+          Container(
+            margin: const EdgeInsets.only(right: AppSpacing.sm),
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: AppColors.secondary,
+              borderRadius: BorderRadius.circular(10),
             ),
-            Container(
-              margin: const EdgeInsets.only(right: 8),
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: const Color(0xFF0891B2),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.tune_rounded,
-                size: 18,
-                color: Colors.white,
-              ),
+            child: const Icon(
+              Icons.tune_rounded,
+              size: 18,
+              color: Colors.white,
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -163,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildServicesGrid() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
       child: Column(
         children: [
           Row(
@@ -202,21 +202,20 @@ class _HomeScreenState extends State<HomeScreen> {
     final s = _countdown.inSeconds % 60;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(18),
         child: Container(
           height: 140,
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF0891B2), Color(0xFF0A2540)],
+              colors: [AppColors.secondary, AppColors.primary],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
           ),
           child: Stack(
             children: [
-              // Decorative circles
               Positioned(
                 right: -30,
                 top: -30,
@@ -241,7 +240,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-              // Palm / nature icon watermark
               Positioned(
                 right: 120,
                 top: 0,
@@ -254,12 +252,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-              // Content
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
                 child: Row(
                   children: [
-                    // Left: deal text
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -297,7 +293,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                     ),
-                    // Right: countdown
                     Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.end,
@@ -311,14 +306,13 @@ class _HomeScreenState extends State<HomeScreen> {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppSpacing.sm),
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             _CountdownUnit(value: _fmt(h), unit: 'h'),
                             Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 2),
                               child: Text(
                                 ':',
                                 style: GoogleFonts.inter(
@@ -330,8 +324,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             _CountdownUnit(value: _fmt(m), unit: 'm'),
                             Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 2),
                               child: Text(
                                 ':',
                                 style: GoogleFonts.inter(
@@ -363,11 +356,11 @@ class _HomeScreenState extends State<HomeScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionHeader(title: 'Recommended for You', onViewAll: () {}),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         SizedBox(
           height: 216,
           child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
             scrollDirection: Axis.horizontal,
             children: const [
               _RecommendedCard(
@@ -410,9 +403,9 @@ class _HomeScreenState extends State<HomeScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _SectionHeader(title: 'Exclusive Deals'),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
           child: GestureDetector(
             onTap: () {},
             child: Container(
@@ -420,7 +413,7 @@ class _HomeScreenState extends State<HomeScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                border: Border.all(color: AppColors.borderLight),
                 boxShadow: const [
                   BoxShadow(
                     color: Color(0x0A0A2540),
@@ -431,7 +424,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: Row(
                 children: [
-                  // Image placeholder
                   ClipRRect(
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(13),
@@ -453,12 +445,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
-                  // Info
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
-                        vertical: 12,
+                        vertical: AppSpacing.md,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -471,18 +462,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                   style: GoogleFonts.plusJakartaSans(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF0A2540),
+                                    color: AppColors.primary,
                                   ),
                                 ),
                               ),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
+                                  horizontal: AppSpacing.sm,
                                   vertical: 3,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFEF4444),
-                                  borderRadius: BorderRadius.circular(8),
+                                  color: AppColors.error,
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                                 ),
                                 child: Text(
                                   '-45%',
@@ -500,7 +491,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             'Zermatt, Switzerland',
                             style: GoogleFonts.inter(
                               fontSize: 12,
-                              color: const Color(0xFF64748B),
+                              color: AppColors.textMuted,
                             ),
                           ),
                           const Spacer(),
@@ -512,7 +503,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w800,
-                                  color: const Color(0xFF0891B2),
+                                  color: AppColors.secondary,
                                 ),
                               ),
                               const SizedBox(width: 6),
@@ -550,9 +541,9 @@ class _HomeScreenState extends State<HomeScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionHeader(title: 'Top Destinations', onViewAll: () {}),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
           child: Row(
             children: const [
               Expanded(
@@ -563,7 +554,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: Icons.temple_buddhist_rounded,
                 ),
               ),
-              SizedBox(width: 12),
+              SizedBox(width: AppSpacing.md),
               Expanded(
                 child: _DestinationCard(
                   name: 'Paris',
@@ -587,11 +578,7 @@ class _ServiceTile extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
 
-  const _ServiceTile({
-    required this.icon,
-    required this.label,
-    this.onTap,
-  });
+  const _ServiceTile({required this.icon, required this.label, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -601,7 +588,7 @@ class _ServiceTile extends StatelessWidget {
         children: [
           Material(
             color: AppColors.secondary.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: onTap,
@@ -646,7 +633,7 @@ class _CountdownUnit extends StatelessWidget {
           height: 40,
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.18),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
           ),
           alignment: Alignment.center,
           child: Text(
@@ -681,7 +668,7 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -690,7 +677,7 @@ class _SectionHeader extends StatelessWidget {
             style: GoogleFonts.plusJakartaSans(
               fontSize: 17,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFF0A2540),
+              color: AppColors.primary,
               letterSpacing: -0.2,
             ),
           ),
@@ -702,7 +689,7 @@ class _SectionHeader extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: const Color(0xFF0891B2),
+                  color: AppColors.secondary,
                 ),
               ),
             ),
@@ -738,7 +725,7 @@ class _RecommendedCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: AppColors.borderLight),
           boxShadow: const [
             BoxShadow(
               color: Color(0x0A0A2540),
@@ -775,8 +762,8 @@ class _RecommendedCard extends StatelessWidget {
                   ),
                 ),
                 Positioned(
-                  top: 8,
-                  right: 8,
+                  top: AppSpacing.sm,
+                  right: AppSpacing.sm,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 7,
@@ -800,7 +787,7 @@ class _RecommendedCard extends StatelessWidget {
                           style: GoogleFonts.inter(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
-                            color: const Color(0xFF0A2540),
+                            color: AppColors.primary,
                           ),
                         ),
                       ],
@@ -810,7 +797,7 @@ class _RecommendedCard extends StatelessWidget {
               ],
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+              padding: const EdgeInsets.all(10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -819,7 +806,7 @@ class _RecommendedCard extends StatelessWidget {
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: const Color(0xFF0A2540),
+                      color: AppColors.primary,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -829,7 +816,7 @@ class _RecommendedCard extends StatelessWidget {
                     location,
                     style: GoogleFonts.inter(
                       fontSize: 11,
-                      color: const Color(0xFF64748B),
+                      color: AppColors.textMuted,
                     ),
                   ),
                   const SizedBox(height: 7),
@@ -841,7 +828,7 @@ class _RecommendedCard extends StatelessWidget {
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
-                          color: const Color(0xFF0891B2),
+                          color: AppColors.secondary,
                         ),
                       ),
                       Padding(
@@ -919,8 +906,8 @@ class _DestinationCard extends StatelessWidget {
                 ),
               ),
               Positioned(
-                left: 12,
-                bottom: 12,
+                left: AppSpacing.md,
+                bottom: AppSpacing.md,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
