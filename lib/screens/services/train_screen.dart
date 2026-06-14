@@ -104,12 +104,12 @@ class _TrainContentState extends State<TrainContent> {
 
   Future<void> _loadStations() async {
     try {
-      final dynamic raw = await supabase
+      final data = await supabase
           .from('stations')
           .select('code, name, city')
           .order('city');
-      final stations = (raw as List)
-          .map((e) => TrainStation.fromJson(e as Map<String, dynamic>))
+      final stations = data
+          .map((e) => TrainStation.fromJson(e))
           .toList();
       if (mounted) setState(() => _stations = stations);
     } catch (_) {}
@@ -126,7 +126,7 @@ class _TrainContentState extends State<TrainContent> {
     final stationMap = {for (final s in _stations) s.code: s.displayName};
 
     try {
-      final dynamic raw = await supabase
+      final rawData = await supabase
           .from('train_schedules')
           .select(
             'id, from_station, to_station, departs_at, arrives_at, '
@@ -139,8 +139,7 @@ class _TrainContentState extends State<TrainContent> {
 
       final List<TrainTrip> trips = [];
 
-      for (final item in raw as List) {
-        final schedule = item as Map<String, dynamic>;
+      for (final schedule in rawData) {
         final train = (schedule['trains'] as Map<String, dynamic>?) ?? {};
         final classes = (schedule['train_classes'] as List?) ?? [];
 
@@ -652,18 +651,56 @@ class _BookingDialogState extends State<_BookingDialog> {
 
   double get _total => widget.trip.fare * _passengers;
 
-  void _confirm() {
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Booking confirmed for $_passengers passenger${_passengers > 1 ? 's' : ''}!',
-        ),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+  bool _confirming = false;
+
+  Future<void> _confirm() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+    setState(() => _confirming = true);
+    final trip = widget.trip;
+    final ref = 'TM-TR-${DateTime.now().millisecondsSinceEpoch % 90000 + 10000}';
+    try {
+      await supabase.from('bookings').insert({
+        'user_id': user.id,
+        'service_type': 'train',
+        'reference_code': ref,
+        'status': 'confirmed',
+        'total_amount': _total,
+        'currency': 'BDT',
+        'details': {
+          'schedule_id': trip.scheduleId,
+          'class_id': trip.classId,
+          'train': trip.trainName,
+          'train_number': trip.trainNumber,
+          'from': trip.fromCode,
+          'to': trip.toCode,
+          'class': trip.className,
+          'passengers': _passengers,
+          'departs_at': trip.departsAt.toIso8601String(),
+        },
+        'starts_at': trip.departsAt.toIso8601String(),
+      });
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Train booked! Ref: $ref'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ));
+      }
+    } on PostgrestException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.message),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _confirming = false);
+    }
   }
 
   @override
@@ -848,8 +885,10 @@ class _BookingDialogState extends State<_BookingDialog> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      onPressed: _confirm,
-                      child: Text('Confirm Booking', style: AppTextStyles.btnSm),
+                      onPressed: _confirming ? null : _confirm,
+                      child: _confirming
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : Text('Confirm Booking', style: AppTextStyles.btnSm),
                     ),
                   ),
                 ]),
