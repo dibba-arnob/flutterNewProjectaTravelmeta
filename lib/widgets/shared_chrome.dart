@@ -1,19 +1,53 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../screens/notifications_screen.dart';
+import '../services/supabase_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 
 // ─── App Bar ─────────────────────────────────────────────────────────────────
-// Used by MainShell (leading = null → shows logo circle) and every
-// service page (leading = hamburger Builder that opens the drawer).
 
-class TmAppBar extends StatelessWidget implements PreferredSizeWidget {
-  /// Override the leading widget.  When null the gradient logo circle is shown.
+class TmAppBar extends StatefulWidget implements PreferredSizeWidget {
   final Widget? leading;
-
   const TmAppBar({super.key, this.leading});
 
   @override
   Size get preferredSize => const Size.fromHeight(64);
+
+  @override
+  State<TmAppBar> createState() => _TmAppBarState();
+}
+
+class _TmAppBarState extends State<TmAppBar> {
+  int _unread = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUnread();
+  }
+
+  Future<void> _fetchUnread() async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    try {
+      final data = await supabase
+          .from('notifications')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('is_read', false);
+      if (mounted) setState(() => _unread = (data as List).length);
+    } on PostgrestException {
+      // silently ignore — badge just stays at 0
+    } catch (_) {}
+  }
+
+  Future<void> _openNotifications(BuildContext ctx) async {
+    await Navigator.of(ctx).push(
+      MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+    );
+    _fetchUnread();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +58,7 @@ class TmAppBar extends StatelessWidget implements PreferredSizeWidget {
       surfaceTintColor: Colors.white,
       titleSpacing: 0,
       automaticallyImplyLeading: false,
-      leading: leading ??
+      leading: widget.leading ??
           Padding(
             padding: const EdgeInsets.only(left: 16, top: 12, bottom: 12),
             child: Container(
@@ -76,42 +110,55 @@ class TmAppBar extends StatelessWidget implements PreferredSizeWidget {
         ],
       ),
       actions: [
-        Padding(
-          padding: const EdgeInsets.only(right: 16),
-          child: Stack(
-            alignment: Alignment.center,
-            clipBehavior: Clip.none,
-            children: [
-              GestureDetector(
-                onTap: () {},
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF1F5F9),
-                    shape: BoxShape.circle,
+        Builder(
+          builder: (ctx) => Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: GestureDetector(
+              onTap: () => _openNotifications(ctx),
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.notifications_outlined,
+                      color: AppColors.primary,
+                      size: 22,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.notifications_outlined,
-                    color: AppColors.primary,
-                    size: 22,
-                  ),
-                ),
+                  if (_unread > 0)
+                    Positioned(
+                      top: 4,
+                      right: 3,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        decoration: BoxDecoration(
+                          color: AppColors.error,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                        child: Text(
+                          _unread > 99 ? '99+' : '$_unread',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            height: 1.2,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              Positioned(
-                top: 6,
-                right: 5,
-                child: Container(
-                  width: 9,
-                  height: 9,
-                  decoration: BoxDecoration(
-                    color: AppColors.error,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 1.5),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ],

@@ -39,7 +39,7 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: const TmAppBar(),
+      appBar: TmAppBar(),
       body: IndexedStack(index: _idx, children: _pages),
       bottomNavigationBar: TmBottomNav(
         currentIndex: _idx,
