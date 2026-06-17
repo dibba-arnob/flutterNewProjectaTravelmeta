@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/supabase_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../payment_folder/booking_payload.dart';
+import '../payment_folder/checkout_screen.dart';
 
 // ─── Storage helper ───────────────────────────────────────────────────────────
 
@@ -185,15 +186,19 @@ class PackageDetailScreen extends StatefulWidget {
 class _PackageDetailScreenState extends State<PackageDetailScreen> {
   bool _isFavorited = false;
 
-  void _openBookingSheet() {
+  Future<void> _openBookingSheet() async {
     final pkg   = widget.package;
     final color = _categoryColor(pkg.category);
-    showModalBottomSheet(
+    final payload = await showModalBottomSheet<BookingPayload>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _BookingSheet(package: pkg, accentColor: color),
     );
+    if (payload != null && mounted) {
+      Navigator.push(context,
+          MaterialPageRoute(builder: (_) => CheckoutScreen(payload: payload)));
+    }
   }
 
   @override
@@ -1048,7 +1053,6 @@ class _BookingSheetState extends State<_BookingSheet> {
 
   int       _travelers  = 1;
   DateTime? _travelDate;
-  bool      _submitting = false;
 
   double get _totalPrice => widget.package.price * _travelers;
 
@@ -1070,7 +1074,7 @@ class _BookingSheetState extends State<_BookingSheet> {
     if (date != null) setState(() => _travelDate = date);
   }
 
-  Future<void> _submit() async {
+  void _submit() {
     if (!_formKey.currentState!.validate()) return;
     if (_travelDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1078,18 +1082,19 @@ class _BookingSheetState extends State<_BookingSheet> {
       );
       return;
     }
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
 
-    setState(() => _submitting = true);
-    try {
-      final ref = 'TM-PK-${DateTime.now().millisecondsSinceEpoch % 90000 + 10000}';
-      await supabase.from('bookings').insert({
-        'user_id': supabase.auth.currentUser?.id ?? '',
-        'service_type': 'package',
-        'reference_code': ref,
-        'status': 'pending',
-        'total_amount': _totalPrice,
-        'currency': widget.package.currency,
-        'details': {
+    final d = _travelDate!;
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    final dateStr = '${months[d.month - 1]} ${d.day}, ${d.year}';
+    Navigator.pop(
+      context,
+      BookingPayload(
+        serviceType: 'package',
+        baseAmount: _totalPrice,
+        currency: widget.package.currency,
+        details: {
           'package_id': widget.package.id,
           'package_title': widget.package.title,
           'travelers': _travelers,
@@ -1097,38 +1102,19 @@ class _BookingSheetState extends State<_BookingSheet> {
           'contact_phone': _phoneCtrl.text.trim(),
           'category': widget.package.category,
         },
-        'starts_at': _travelDate!.toIso8601String(),
-      });
-
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Booking confirmed! We\'ll contact you soon.'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      }
-    } on PostgrestException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(e.message),
-              backgroundColor: AppColors.error),
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to submit booking.'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
+        startsAt: _travelDate,
+        title: widget.package.title,
+        subtitle: widget.package.agencyName,
+        quantitySummary: '$_travelers Traveler${_travelers > 1 ? 's' : ''}',
+        checkInLabel: 'TRAVEL DATE',
+        checkInValue: dateStr,
+        guestsLabel: 'TRAVELERS',
+        guestsValue: '$_travelers Adult${_travelers > 1 ? 's' : ''}',
+        serviceIcon: Icons.luggage_rounded,
+        serviceLabel: 'Package',
+        accentColor: widget.accentColor,
+      ),
+    );
   }
 
   @override
@@ -1271,22 +1257,15 @@ class _BookingSheetState extends State<_BookingSheet> {
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton(
-                    onPressed: _submitting ? null : _submit,
+                    onPressed: _submit,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: _submitting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                                color: Colors.white, strokeWidth: 2),
-                          )
-                        : Text('Confirm Booking',
-                            style: AppTextStyles.btn),
+                    child: Text('Proceed to Payment',
+                        style: AppTextStyles.btn),
                   ),
                 ),
               ],

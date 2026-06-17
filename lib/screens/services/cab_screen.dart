@@ -4,6 +4,8 @@ import '../../services/supabase_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import 'service_widgets.dart';
+import '../payment_folder/booking_payload.dart';
+import '../payment_folder/checkout_screen.dart';
 
 // ─── Models ───────────────────────────────────────────────────────────────────
 
@@ -374,8 +376,8 @@ class _CabContentState extends State<CabContent> {
     );
   }
 
-  void _showBookingDialog(CabDriver driver) {
-    showDialog(
+  Future<void> _showBookingDialog(CabDriver driver) async {
+    final payload = await showDialog<BookingPayload>(
       context: context,
       barrierDismissible: true,
       builder: (_) => _BookingDialog(
@@ -386,6 +388,10 @@ class _CabContentState extends State<CabContent> {
             : _destinationCtrl.text.trim(),
       ),
     );
+    if (payload != null && mounted) {
+      Navigator.push(context,
+          MaterialPageRoute(builder: (_) => CheckoutScreen(payload: payload)));
+    }
   }
 }
 
@@ -699,24 +705,18 @@ class _BookingDialog extends StatefulWidget {
 }
 
 class _BookingDialogState extends State<_BookingDialog> {
-  bool _confirming = false;
-
-  Future<void> _confirm() async {
+  void _proceed() {
     final user = supabase.auth.currentUser;
     if (user == null) return;
-    setState(() => _confirming = true);
     final driver = widget.driver;
     final vt = driver.vehicleType;
-    final ref = 'TM-CB-${DateTime.now().millisecondsSinceEpoch % 90000 + 10000}';
-    try {
-      await supabase.from('bookings').insert({
-        'user_id': user.id,
-        'service_type': 'cab',
-        'reference_code': ref,
-        'status': 'confirmed',
-        'total_amount': vt.baseFare,
-        'currency': 'BDT',
-        'details': {
+    Navigator.pop(
+      context,
+      BookingPayload(
+        serviceType: 'cab',
+        baseAmount: vt.baseFare,
+        currency: 'BDT',
+        details: {
           'driver_id': driver.id,
           'driver_name': driver.fullName,
           'vehicle_type': vt.name,
@@ -727,28 +727,18 @@ class _BookingDialogState extends State<_BookingDialog> {
           'base_fare': vt.baseFare,
           'per_km': vt.perKm,
         },
-      });
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Cab booked! Ref: $ref'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ));
-      }
-    } on PostgrestException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(e.message),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ));
-      }
-    } finally {
-      if (mounted) setState(() => _confirming = false);
-    }
+        title: driver.fullName,
+        subtitle: '${widget.pickup} → ${widget.destination}',
+        quantitySummary: vt.name,
+        checkInLabel: 'PICKUP',
+        checkInValue: widget.pickup,
+        guestsLabel: 'CAPACITY',
+        guestsValue: '${vt.capacity} Seat${vt.capacity > 1 ? 's' : ''}',
+        serviceIcon: Icons.local_taxi_rounded,
+        serviceLabel: 'Cab',
+        accentColor: AppColors.warning,
+      ),
+    );
   }
 
   @override
@@ -962,10 +952,8 @@ class _BookingDialogState extends State<_BookingDialog> {
                                 borderRadius: BorderRadius.circular(12)),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
-                          onPressed: _confirming ? null : _confirm,
-                          child: _confirming
-                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                              : Text('Confirm Booking', style: AppTextStyles.btnSm),
+                          onPressed: _proceed,
+                          child: Text('Proceed to Payment', style: AppTextStyles.btnSm),
                         ),
                       ),
                     ]),

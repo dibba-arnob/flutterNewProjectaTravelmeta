@@ -4,6 +4,8 @@ import '../../services/supabase_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import 'service_widgets.dart';
+import '../payment_folder/booking_payload.dart';
+import '../payment_folder/checkout_screen.dart';
 
 const _kAccent = AppColors.secondary;
 
@@ -192,11 +194,17 @@ class _GuideContentState extends State<GuideContent> {
     );
   }
 
-  void _showBooking(Guide guide) => showDialog(
-        context: context,
-        barrierDismissible: true,
-        builder: (_) => _BookingDialog(guide: guide),
-      );
+  Future<void> _showBooking(Guide guide) async {
+    final payload = await showDialog<BookingPayload>(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => _BookingDialog(guide: guide),
+    );
+    if (payload != null && mounted) {
+      Navigator.push(context,
+          MaterialPageRoute(builder: (_) => CheckoutScreen(payload: payload)));
+    }
+  }
 }
 
 // ─── Search field ─────────────────────────────────────────────────────────────
@@ -565,8 +573,6 @@ class _BookingDialogState extends State<_BookingDialog> {
   _BookingType _type = _BookingType.fullDay;
   int _qty = 1;
   DateTime _startDate = DateTime.now().add(const Duration(days: 1));
-  bool _confirming = false;
-
   @override
   void initState() {
     super.initState();
@@ -636,50 +642,37 @@ class _BookingDialogState extends State<_BookingDialog> {
     if (picked != null && mounted) setState(() => _startDate = picked);
   }
 
-  Future<void> _confirm() async {
+  void _proceed() {
     final user = supabase.auth.currentUser;
     if (user == null) return;
-    setState(() => _confirming = true);
-    final ref = 'TM-GD-${DateTime.now().millisecondsSinceEpoch % 90000 + 10000}';
-    try {
-      await supabase.from('bookings').insert({
-        'user_id': user.id,
-        'service_type': 'guide',
-        'reference_code': ref,
-        'status': 'pending',
-        'total_amount': _total,
-        'currency': 'BDT',
-        'details': {
-          'guide_id': widget.guide.id,
-          'guide_name': widget.guide.name,
-          'location': widget.guide.location,
+    final guide = widget.guide;
+    Navigator.pop(
+      context,
+      BookingPayload(
+        serviceType: 'guide',
+        baseAmount: _total,
+        currency: 'BDT',
+        details: {
+          'guide_id': guide.id,
+          'guide_name': guide.name,
+          'location': guide.location,
           'booking_type': _type.name,
           'quantity': _qty,
           'date': _dateKey(_startDate),
         },
-        'starts_at': _startDate.toIso8601String(),
-      });
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Guide booked! Ref: $ref'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ));
-      }
-    } on PostgrestException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(e.message),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ));
-      }
-    } finally {
-      if (mounted) setState(() => _confirming = false);
-    }
+        startsAt: _startDate,
+        title: guide.name,
+        subtitle: '${guide.location} · ${_type.name} booking',
+        quantitySummary: '$_qty $_unitLabel',
+        checkInLabel: 'BOOKING DATE',
+        checkInValue: _fmtDate(_startDate),
+        guestsLabel: 'SESSIONS',
+        guestsValue: '$_qty $_unitLabel',
+        serviceIcon: Icons.person_pin_rounded,
+        serviceLabel: 'Guide',
+        accentColor: _kAccent,
+      ),
+    );
   }
 
   @override
@@ -910,13 +903,8 @@ class _BookingDialogState extends State<_BookingDialog> {
                               borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
-                        onPressed: _confirming ? null : _confirm,
-                        child: _confirming
-                            ? const SizedBox(
-                                width: 18, height: 18,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white))
-                            : Text('Confirm Booking', style: AppTextStyles.btnSm),
+                        onPressed: _proceed,
+                        child: Text('Proceed to Payment', style: AppTextStyles.btnSm),
                       ),
                     ),
                   ]),

@@ -6,7 +6,7 @@ import 'home_screen.dart';
 import 'explore_screen.dart';
 import 'bookings_screen.dart';
 import 'community_screen.dart';
-import 'profile_screen.dart';
+import 'profile_folder/profile_screen.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});

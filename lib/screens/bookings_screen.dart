@@ -42,7 +42,7 @@ class Booking {
           (e) => e.name == (j['service_type'] as String),
           orElse: () => ServiceType.flight,
         ),
-        referenceCode: j['reference_code'] as String,
+        referenceCode: (j['reference_code'] as String?) ?? (j['id'] as String? ?? ''),
         status: BookingStatus.values.firstWhere(
           (e) => e.name == (j['status'] as String),
           orElse: () => BookingStatus.pending,
@@ -143,7 +143,10 @@ class _BookingsScreenState extends State<BookingsScreen> {
         child: ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           itemCount: _bookings.length,
-          itemBuilder: (_, i) => _BookingCard(booking: _bookings[i]),
+          itemBuilder: (_, i) => _BookingCard(
+            booking: _bookings[i],
+            onRefresh: _loadBookings,
+          ),
         ),
       ),
     );
@@ -152,9 +155,166 @@ class _BookingsScreenState extends State<BookingsScreen> {
 
 // ─── Booking card ─────────────────────────────────────────────────────────────
 
-class _BookingCard extends StatelessWidget {
+class _BookingCard extends StatefulWidget {
   final Booking booking;
-  const _BookingCard({required this.booking});
+  final VoidCallback onRefresh;
+  const _BookingCard({required this.booking, required this.onRefresh});
+
+  @override
+  State<_BookingCard> createState() => _BookingCardState();
+}
+
+class _BookingCardState extends State<_BookingCard> {
+  bool _busy = false;
+
+  bool get _isActionable =>
+      widget.booking.status == BookingStatus.pending ||
+      widget.booking.status == BookingStatus.confirmed;
+
+  Future<void> _handleCancel() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Cancel Booking', style: AppTextStyles.h6),
+        content: Text(
+          'Cancel ${_serviceLabel(widget.booking.serviceType)} booking '
+          '${widget.booking.referenceCode}?\n\nThis action cannot be undone.',
+          style: AppTextStyles.bodySm,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep Booking'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Yes, Cancel'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      // Silently clear child records — ignore wrong-column-name errors
+      try { await supabase.from('payments').delete().eq('booking_id', widget.booking.id); } catch (_) {}
+      try { await supabase.from('tickets').delete().eq('booking_id', widget.booking.id); } catch (_) {}
+      try { await supabase.from('booking_events').delete().eq('booking_id', widget.booking.id); } catch (_) {}
+
+      // Use .select() so we get back the deleted row — empty list means RLS blocked it
+      final deleted = await supabase
+          .from('bookings')
+          .delete()
+          .eq('id', widget.booking.id)
+          .select('id');
+
+      if (deleted.isEmpty) {
+        throw Exception(
+          'Booking could not be deleted. Make sure your Supabase bookings table has a DELETE RLS policy for the owner.',
+        );
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Booking cancelled and removed.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        widget.onRefresh();
+      }
+    } on PostgrestException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to cancel: ${e.message}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _handleReschedule() async {
+    final now = DateTime.now();
+    final current = widget.booking.startsAt;
+    final initialDate = (current != null && current.isAfter(now))
+        ? current
+        : now.add(const Duration(days: 1));
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: now.add(const Duration(days: 1)),
+      lastDate: now.add(const Duration(days: 365)),
+      helpText: 'Select New Date',
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: AppColors.secondary,
+            onPrimary: Colors.white,
+            surface: Colors.white,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+
+    if (picked == null || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      await supabase
+          .from('bookings')
+          .update({'starts_at': picked.toIso8601String()})
+          .eq('id', widget.booking.id);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Rescheduled to ${_fmtDate(picked)}'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+      widget.onRefresh();
+    } on PostgrestException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to reschedule: ${e.message}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Something went wrong. Please try again.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -171,6 +331,7 @@ class _BookingCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Header ──────────────────────────────────────────
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -183,7 +344,7 @@ class _BookingCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
-                    _serviceIcon(booking.serviceType),
+                    _serviceIcon(widget.booking.serviceType),
                     size: 18,
                     color: AppColors.secondary,
                   ),
@@ -191,7 +352,7 @@ class _BookingCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(
-                    _serviceLabel(booking.serviceType),
+                    _serviceLabel(widget.booking.serviceType),
                     style: AppTextStyles.label.copyWith(
                       color: AppColors.primary,
                       fontWeight: FontWeight.w700,
@@ -199,12 +360,12 @@ class _BookingCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 1),
                   Text(
-                    booking.referenceCode,
+                    widget.booking.referenceCode,
                     style: AppTextStyles.caption.copyWith(fontSize: 11),
                   ),
                 ]),
               ]),
-              _StatusBadge(status: booking.status),
+              _StatusBadge(status: widget.booking.status),
             ],
           ),
 
@@ -212,6 +373,7 @@ class _BookingCard extends StatelessWidget {
           const Divider(height: 1, color: AppColors.borderLight),
           const SizedBox(height: 12),
 
+          // ── Amount & Date ────────────────────────────────────
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -222,18 +384,18 @@ class _BookingCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  booking.formattedAmount,
+                  widget.booking.formattedAmount,
                   style: AppTextStyles.price.copyWith(color: AppColors.secondary),
                 ),
               ]),
               Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                 Text(
-                  booking.startsAt != null ? 'SERVICE DATE' : 'BOOKED ON',
+                  widget.booking.startsAt != null ? 'SERVICE DATE' : 'BOOKED ON',
                   style: AppTextStyles.caption.copyWith(fontSize: 10, letterSpacing: 0.8),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _fmtDate(booking.startsAt ?? booking.createdAt),
+                  _fmtDate(widget.booking.startsAt ?? widget.booking.createdAt),
                   style: AppTextStyles.labelSm.copyWith(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w700,
@@ -242,6 +404,59 @@ class _BookingCard extends StatelessWidget {
               ]),
             ],
           ),
+
+          // ── Action buttons (pending / confirmed only) ────────
+          if (_isActionable) ...[
+            const SizedBox(height: 14),
+            const Divider(height: 1, color: AppColors.borderLight),
+            const SizedBox(height: 12),
+            _busy
+                ? const Center(
+                    child: SizedBox(
+                      height: 28,
+                      width: 28,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation(AppColors.secondary),
+                      ),
+                    ),
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.secondary,
+                            side: const BorderSide(color: AppColors.secondary),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                          onPressed: _handleReschedule,
+                          icon: const Icon(Icons.calendar_month_rounded, size: 16),
+                          label: Text('Reschedule', style: AppTextStyles.btnSm),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.error,
+                            side: const BorderSide(color: AppColors.error),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                          onPressed: _handleCancel,
+                          icon: const Icon(Icons.cancel_outlined, size: 16),
+                          label: Text('Cancel', style: AppTextStyles.btnSm),
+                        ),
+                      ),
+                    ],
+                  ),
+          ],
         ],
       ),
     );
