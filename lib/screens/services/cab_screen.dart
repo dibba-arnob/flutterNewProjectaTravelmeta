@@ -705,6 +705,20 @@ class _BookingDialog extends StatefulWidget {
 }
 
 class _BookingDialogState extends State<_BookingDialog> {
+  final _kmCtrl = TextEditingController();
+  double _km = 0;
+
+  @override
+  void dispose() {
+    _kmCtrl.dispose();
+    super.dispose();
+  }
+
+  double get _totalFare {
+    final vt = widget.driver.vehicleType;
+    return vt.baseFare + (_km * vt.perKm);
+  }
+
   void _proceed() {
     final user = supabase.auth.currentUser;
     if (user == null) return;
@@ -714,7 +728,7 @@ class _BookingDialogState extends State<_BookingDialog> {
       context,
       BookingPayload(
         serviceType: 'cab',
-        baseAmount: vt.baseFare,
+        baseAmount: _totalFare,
         currency: 'BDT',
         details: {
           'driver_id': driver.id,
@@ -726,10 +740,12 @@ class _BookingDialogState extends State<_BookingDialog> {
           'destination': widget.destination,
           'base_fare': vt.baseFare,
           'per_km': vt.perKm,
+          'distance_km': _km,
+          'estimated_total': _totalFare,
         },
         title: driver.fullName,
         subtitle: '${widget.pickup} → ${widget.destination}',
-        quantitySummary: vt.name,
+        quantitySummary: _km > 0 ? '${_km.toStringAsFixed(1)} km · ${vt.name}' : vt.name,
         checkInLabel: 'PICKUP',
         checkInValue: widget.pickup,
         guestsLabel: 'CAPACITY',
@@ -898,27 +914,90 @@ class _BookingDialogState extends State<_BookingDialog> {
 
                     const SizedBox(height: 18),
                     const Divider(height: 1, color: AppColors.borderLight),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 16),
 
-                    // Fare note
+                    // ── Distance input ───────────────────────────────────
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Distance',
+                        style: AppTextStyles.label.copyWith(
+                            color: AppColors.primary, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _kmCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      cursorColor: AppColors.warning,
+                      style: AppTextStyles.body.copyWith(color: AppColors.primary),
+                      decoration: InputDecoration(
+                        hintText: 'Enter distance in km',
+                        hintStyle: AppTextStyles.caption,
+                        prefixIcon: const Icon(Icons.route_rounded,
+                            size: 18, color: AppColors.warning),
+                        suffixText: 'km',
+                        suffixStyle: AppTextStyles.label.copyWith(
+                            color: AppColors.textMuted),
+                        filled: true,
+                        fillColor: AppColors.surfaceLight,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 12),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.borderLight),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: AppColors.warning, width: 1.5),
+                        ),
+                      ),
+                      onChanged: (v) {
+                        setState(() => _km = double.tryParse(v) ?? 0);
+                      },
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // ── Fare breakdown ───────────────────────────────────
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: AppColors.warning.withValues(alpha: 0.07),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                             color: AppColors.warning.withValues(alpha: 0.25)),
                       ),
-                      child: Row(children: [
-                        const Icon(Icons.info_outline_rounded,
-                            size: 15, color: AppColors.warning),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Base fare ৳${vt.baseFare.toStringAsFixed(0)} + ৳${vt.perKm.toStringAsFixed(0)}/km. '
-                            'Final fare calculated at trip end.',
-                            style: AppTextStyles.caption.copyWith(fontSize: 11),
-                          ),
+                      child: Column(children: [
+                        _FareRow(
+                          label: 'Base fare',
+                          value: '৳ ${vt.baseFare.toStringAsFixed(0)}',
+                        ),
+                        const SizedBox(height: 8),
+                        _FareRow(
+                          label: '${_km > 0 ? _km.toStringAsFixed(1) : '0'} km × ৳${vt.perKm.toStringAsFixed(0)}/km',
+                          value: '৳ ${(_km * vt.perKm).toStringAsFixed(0)}',
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 10),
+                          child: Divider(height: 1, color: AppColors.borderLight),
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Estimated Total',
+                              style: AppTextStyles.label.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w700),
+                            ),
+                            Text(
+                              '৳ ${_totalFare.toStringAsFixed(0)}',
+                              style: AppTextStyles.price
+                                  .copyWith(color: AppColors.warning),
+                            ),
+                          ],
                         ),
                       ]),
                     ),
@@ -999,5 +1078,23 @@ class _InfoTile extends StatelessWidget {
             ),
           ]),
         ),
+      );
+}
+
+class _FareRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const _FareRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) => Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: AppTextStyles.caption.copyWith(
+                  fontSize: 12, color: AppColors.textMuted)),
+          Text(value,
+              style: AppTextStyles.label.copyWith(color: AppColors.primary)),
+        ],
       );
 }

@@ -1,27 +1,53 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../services/supabase_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import 'explore_screen.dart';
+import 'service_screens.dart';
 
-// ─── Data model (swap _mockData list with real DB results later) ──────────────
+// ─── Result model ─────────────────────────────────────────────────────────────
 
-class _SearchItem {
-  final String name;
+class _SearchResult {
+  final String title;
   final String subtitle;
   final String category;
-  final double rating;
-  final int price;
-  final List<Color> gradientColors;
-  final IconData icon;
+  final double? rating;
+  final String? priceStr;
+  final Map<String, dynamic> raw;
 
-  const _SearchItem({
-    required this.name,
+  const _SearchResult({
+    required this.title,
     required this.subtitle,
     required this.category,
-    required this.rating,
-    required this.price,
-    required this.gradientColors,
-    required this.icon,
+    this.rating,
+    this.priceStr,
+    required this.raw,
   });
+
+  IconData get icon {
+    switch (category) {
+      case 'Places':   return Icons.landscape_rounded;
+      case 'Packages': return Icons.card_travel_rounded;
+      case 'Flights':  return Icons.flight_takeoff_rounded;
+      case 'Bus':      return Icons.directions_bus_rounded;
+      case 'Train':    return Icons.train_rounded;
+      case 'Guides':   return Icons.person_pin_circle_rounded;
+      default:         return Icons.search_rounded;
+    }
+  }
+
+  Color get color {
+    switch (category) {
+      case 'Places':   return AppColors.secondary;
+      case 'Packages': return const Color(0xFFEC4899);
+      case 'Flights':  return AppColors.primary;
+      case 'Bus':      return const Color(0xFF059669);
+      case 'Train':    return const Color(0xFF7C3AED);
+      case 'Guides':   return const Color(0xFFEF4444);
+      default:         return AppColors.textMuted;
+    }
+  }
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -39,145 +65,19 @@ class _SearchScreenState extends State<SearchScreen> {
 
   String _query = '';
   String _category = 'All';
-  RangeValues _priceRange = const RangeValues(0, 2000);
   int _minRating = 0;
   bool _filtersOpen = false;
 
+  List<_SearchResult> _results = [];
+  bool _loading = false;
+  String? _searchError;
+  Timer? _debounce;
+
   static const _categories = [
-    'All',
-    'Places',
-    'Hotels',
-    'Flights',
-    'Bus',
-    'Packages',
+    'All', 'Places', 'Packages', 'Flights', 'Bus', 'Train', 'Guides',
   ];
 
-  // Replace this list with a DB/API call in _loadResults()
-  static const _mockData = [
-    _SearchItem(
-      name: 'Bali, Indonesia',
-      subtitle: 'Tropical paradise with stunning rice terraces and beaches',
-      category: 'Places',
-      rating: 4.8,
-      price: 240,
-      gradientColors: [Color(0xFF166534), Color(0xFF4ADE80)],
-      icon: Icons.beach_access_rounded,
-    ),
-    _SearchItem(
-      name: 'Kyoto, Japan',
-      subtitle: 'Ancient temples, cherry blossoms and serene gardens',
-      category: 'Places',
-      rating: 4.9,
-      price: 310,
-      gradientColors: [Color(0xFF831843), Color(0xFFF472B6)],
-      icon: Icons.temple_buddhist_rounded,
-    ),
-    _SearchItem(
-      name: 'Paris, France',
-      subtitle: 'The city of love, art and the Eiffel Tower',
-      category: 'Places',
-      rating: 4.7,
-      price: 420,
-      gradientColors: [Color(0xFF1E3A5F), Color(0xFF93C5FD)],
-      icon: Icons.location_city_rounded,
-    ),
-    _SearchItem(
-      name: 'Swiss Alps Retreat',
-      subtitle: 'Zermatt, Switzerland — alpine luxury',
-      category: 'Hotels',
-      rating: 4.6,
-      price: 180,
-      gradientColors: [Color(0xFF1E3A5F), Color(0xFF708090)],
-      icon: Icons.landscape_rounded,
-    ),
-    _SearchItem(
-      name: 'Marina Bay Suite',
-      subtitle: 'Dubai, UAE — skyline views and world-class amenities',
-      category: 'Hotels',
-      rating: 4.7,
-      price: 350,
-      gradientColors: [Color(0xFF0C4A6E), Color(0xFF38BDF8)],
-      icon: Icons.location_city_rounded,
-    ),
-    _SearchItem(
-      name: 'Ubud Nature Villa',
-      subtitle: 'Bali, Indonesia — jungle hideaway with private pool',
-      category: 'Hotels',
-      rating: 4.8,
-      price: 240,
-      gradientColors: [Color(0xFF166534), Color(0xFF86EFAC)],
-      icon: Icons.forest_rounded,
-    ),
-    _SearchItem(
-      name: 'Dhaka → Dubai',
-      subtitle: 'Direct flight · ~6h · Economy from \$280',
-      category: 'Flights',
-      rating: 4.3,
-      price: 280,
-      gradientColors: [AppColors.primary, AppColors.secondary],
-      icon: Icons.flight_takeoff_rounded,
-    ),
-    _SearchItem(
-      name: 'Dhaka → London',
-      subtitle: '1 stop · ~11h · Economy from \$620',
-      category: 'Flights',
-      rating: 4.1,
-      price: 620,
-      gradientColors: [Color(0xFF312E81), Color(0xFF818CF8)],
-      icon: Icons.flight_rounded,
-    ),
-    _SearchItem(
-      name: 'Dhaka City Bus Pass',
-      subtitle: 'All-day metro bus pass · Unlimited rides',
-      category: 'Bus',
-      rating: 3.9,
-      price: 5,
-      gradientColors: [Color(0xFF92400E), Color(0xFFFBBF24)],
-      icon: Icons.directions_bus_rounded,
-    ),
-    _SearchItem(
-      name: 'Bali Explorer Package',
-      subtitle: '7 nights · Hotel + flights + guided tours',
-      category: 'Packages',
-      rating: 4.8,
-      price: 1299,
-      gradientColors: [Color(0xFF065F46), Color(0xFF34D399)],
-      icon: Icons.luggage_rounded,
-    ),
-    _SearchItem(
-      name: 'Tokyo Adventure Pack',
-      subtitle: '10 nights · Hotel + flights + JR Pass',
-      category: 'Packages',
-      rating: 4.9,
-      price: 1850,
-      gradientColors: [Color(0xFF831843), Color(0xFFFDA4AF)],
-      icon: Icons.luggage_rounded,
-    ),
-    _SearchItem(
-      name: 'Maldives Getaway',
-      subtitle: 'Overwater bungalow · 5 nights all-inclusive',
-      category: 'Packages',
-      rating: 5.0,
-      price: 2500,
-      gradientColors: [Color(0xFF0C4A6E), Color(0xFF7DD3FC)],
-      icon: Icons.water_rounded,
-    ),
-  ];
-
-  // ── Filtering logic — replace with DB query when ready ────────────────────
-  List<_SearchItem> get _results {
-    if (_query.trim().isEmpty) return [];
-    final q = _query.toLowerCase();
-    return _mockData.where((item) {
-      final matchQuery = item.name.toLowerCase().contains(q) ||
-          item.subtitle.toLowerCase().contains(q);
-      final matchCat = _category == 'All' || item.category == _category;
-      final matchPrice =
-          item.price >= _priceRange.start && item.price <= _priceRange.end;
-      final matchRating = item.rating >= _minRating;
-      return matchQuery && matchCat && matchPrice && matchRating;
-    }).toList();
-  }
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   @override
   void initState() {
@@ -187,24 +87,230 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _ctrl.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
+  // ── Search ────────────────────────────────────────────────────────────────
+
+  void _onQueryChanged(String q) {
+    setState(() { _query = q; _searchError = null; });
+    _debounce?.cancel();
+    if (q.trim().isEmpty) {
+      setState(() { _results = []; _loading = false; });
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 420), _search);
+  }
+
+  Future<void> _search() async {
+    final q = _query.trim();
+    if (q.isEmpty) return;
+    setState(() { _loading = true; _searchError = null; });
+
+    try {
+      final futures = <Future<List<_SearchResult>>>[];
+      final cat = _category;
+
+      if (cat == 'All' || cat == 'Places')   futures.add(_searchSpots(q));
+      if (cat == 'All' || cat == 'Packages') futures.add(_searchPackages(q));
+      if (cat == 'All' || cat == 'Flights')  futures.add(_searchFlights(q));
+      if (cat == 'All' || cat == 'Bus')      futures.add(_searchBus(q));
+      if (cat == 'All' || cat == 'Train')    futures.add(_searchTrain(q));
+      if (cat == 'All' || cat == 'Guides')   futures.add(_searchGuides(q));
+
+      final lists = await Future.wait(futures);
+      var all = lists.expand((l) => l).toList();
+
+      if (_minRating > 0) {
+        all = all
+            .where((r) => r.rating != null && r.rating! >= _minRating)
+            .toList();
+      }
+
+      if (mounted) setState(() { _results = all; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _loading = false; _searchError = 'Search failed. Try again.'; });
+    }
+  }
+
+  // ── Per-table queries ─────────────────────────────────────────────────────
+
+  Future<List<_SearchResult>> _searchSpots(String q) async {
+    try {
+      final data = await supabase
+          .from('tourist_spots')
+          .select('id, name, city, category, rating')
+          .or('name.ilike.%$q%,city.ilike.%$q%')
+          .limit(6);
+      return (data as List).map((row) {
+        final name = row['name']?.toString() ?? 'Unknown';
+        final city = row['city']?.toString() ?? '';
+        final cat  = row['category']?.toString() ?? '';
+        return _SearchResult(
+          title: name,
+          subtitle: [city, cat].where((s) => s.isNotEmpty).join(' · '),
+          category: 'Places',
+          rating: (row['rating'] as num?)?.toDouble(),
+          raw: Map<String, dynamic>.from(row as Map),
+        );
+      }).toList();
+    } catch (_) { return []; }
+  }
+
+  Future<List<_SearchResult>> _searchPackages(String q) async {
+    try {
+      final data = await supabase
+          .from('packages')
+          .select('id, title, category, price, currency, rating')
+          .ilike('title', '%$q%')
+          .limit(6);
+      return (data as List).map((row) {
+        final currency = row['currency']?.toString() ?? 'BDT';
+        final price    = (row['price'] as num?)?.toDouble();
+        final sym      = currency == 'BDT' ? '৳' : currency;
+        return _SearchResult(
+          title:    row['title']?.toString() ?? 'Package',
+          subtitle: row['category']?.toString() ?? '',
+          category: 'Packages',
+          rating:   (row['rating'] as num?)?.toDouble(),
+          priceStr: price != null ? '$sym ${price.toStringAsFixed(0)}' : null,
+          raw: Map<String, dynamic>.from(row as Map),
+        );
+      }).toList();
+    } catch (_) { return []; }
+  }
+
+  Future<List<_SearchResult>> _searchFlights(String q) async {
+    try {
+      final data = await supabase
+          .from('flights')
+          .select('id, from_code, to_code, airline_name, base_price, currency, cabin_class')
+          .or('from_code.ilike.%$q%,to_code.ilike.%$q%,airline_name.ilike.%$q%')
+          .limit(6);
+      return (data as List).map((row) {
+        final from     = row['from_code']?.toString() ?? '';
+        final to       = row['to_code']?.toString() ?? '';
+        final airline  = row['airline_name']?.toString() ?? '';
+        final cabin    = row['cabin_class']?.toString() ?? '';
+        final price    = (row['base_price'] as num?)?.toDouble();
+        final currency = row['currency']?.toString() ?? 'BDT';
+        final sym      = currency == 'BDT' ? '৳' : '\$';
+        return _SearchResult(
+          title:    '$from → $to',
+          subtitle: [airline, cabin].where((s) => s.isNotEmpty).join(' · '),
+          category: 'Flights',
+          priceStr: price != null ? '$sym ${price.toStringAsFixed(0)}' : null,
+          raw: Map<String, dynamic>.from(row as Map),
+        );
+      }).toList();
+    } catch (_) { return []; }
+  }
+
+  Future<List<_SearchResult>> _searchBus(String q) async {
+    try {
+      final data = await supabase
+          .from('bus_trips')
+          .select('id, from_city, to_city, fare, bus_operators(name)')
+          .or('from_city.ilike.%$q%,to_city.ilike.%$q%')
+          .limit(6);
+      return (data as List).map((row) {
+        final from     = row['from_city']?.toString() ?? '';
+        final to       = row['to_city']?.toString() ?? '';
+        final operator = (row['bus_operators'] as Map?)?['name']?.toString() ?? '';
+        final fare     = (row['fare'] as num?)?.toDouble();
+        return _SearchResult(
+          title:    '$from → $to',
+          subtitle: operator,
+          category: 'Bus',
+          priceStr: fare != null ? '৳ ${fare.toStringAsFixed(0)}' : null,
+          raw: Map<String, dynamic>.from(row as Map),
+        );
+      }).toList();
+    } catch (_) { return []; }
+  }
+
+  Future<List<_SearchResult>> _searchTrain(String q) async {
+    try {
+      final data = await supabase
+          .from('train_schedules')
+          .select('id, from_station, to_station, trains(name, number)')
+          .or('from_station.ilike.%$q%,to_station.ilike.%$q%')
+          .limit(6);
+      return (data as List).map((row) {
+        final from   = row['from_station']?.toString() ?? '';
+        final to     = row['to_station']?.toString() ?? '';
+        final trains = row['trains'] as Map?;
+        final name   = trains?['name']?.toString() ?? '';
+        final num    = trains?['number']?.toString() ?? '';
+        return _SearchResult(
+          title:    '$from → $to',
+          subtitle: [name, num].where((s) => s.isNotEmpty).join(' · '),
+          category: 'Train',
+          raw: Map<String, dynamic>.from(row as Map),
+        );
+      }).toList();
+    } catch (_) { return []; }
+  }
+
+  Future<List<_SearchResult>> _searchGuides(String q) async {
+    try {
+      final data = await supabase
+          .from('guides')
+          .select('id, name, city, rating, about')
+          .or('name.ilike.%$q%,city.ilike.%$q%')
+          .limit(6);
+      return (data as List).map((row) {
+        final name   = row['name']?.toString() ?? 'Guide';
+        final city   = row['city']?.toString() ?? '';
+        final about  = row['about']?.toString() ?? '';
+        final teaser = about.length > 60 ? '${about.substring(0, 60)}…' : about;
+        return _SearchResult(
+          title:    name,
+          subtitle: city.isNotEmpty ? city : teaser,
+          category: 'Guides',
+          rating:   (row['rating'] as num?)?.toDouble(),
+          raw: Map<String, dynamic>.from(row as Map),
+        );
+      }).toList();
+    } catch (_) { return []; }
+  }
+
+  // ── Navigation ────────────────────────────────────────────────────────────
+
+  void _onResultTap(_SearchResult r) {
+    switch (r.category) {
+      case 'Places':
+        Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const ExploreScreen()));
+      case 'Packages':
+        ServiceNav.navigateTo(context, 5);
+      case 'Flights':
+        ServiceNav.navigateTo(context, 0);
+      case 'Bus':
+        ServiceNav.navigateTo(context, 2);
+      case 'Train':
+        ServiceNav.navigateTo(context, 3);
+      case 'Guides':
+        ServiceNav.navigateTo(context, 6);
+    }
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
   void _clearSearch() {
     _ctrl.clear();
-    setState(() => _query = '');
+    _debounce?.cancel();
+    setState(() { _query = ''; _results = []; _loading = false; _searchError = null; });
   }
 
   void _setQuery(String q) {
     _ctrl.text = q;
     _ctrl.selection = TextSelection.collapsed(offset: q.length);
-    setState(() => _query = q);
+    _onQueryChanged(q);
   }
-
-  String get _priceLabel =>
-      '\$${_priceRange.start.toInt()} – \$${_priceRange.end.toInt()}';
 
   // ── Build ─────────────────────────────────────────────────────────────────
 
@@ -217,13 +323,10 @@ class _SearchScreenState extends State<SearchScreen> {
           children: [
             _buildTopBar(),
             _buildCategoryChips(),
-            // FIX: AnimatedSize needs mainAxisSize.min in the child Column
             AnimatedSize(
               duration: const Duration(milliseconds: 260),
               curve: Curves.easeInOut,
-              child: _filtersOpen
-                  ? _buildFilterPanel()
-                  : const SizedBox.shrink(),
+              child: _filtersOpen ? _buildFilterPanel() : const SizedBox.shrink(),
             ),
             Expanded(child: _buildBody()),
           ],
@@ -235,8 +338,6 @@ class _SearchScreenState extends State<SearchScreen> {
   // ─── Top bar ──────────────────────────────────────────────────────────────
 
   Widget _buildTopBar() {
-    // FIX: Theme override removes the global minHeight:52 constraint that
-    // caused "RenderBox overflowed" inside our 50-px search field container.
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(4, 10, 12, 10),
@@ -266,33 +367,28 @@ class _SearchScreenState extends State<SearchScreen> {
                   children: [
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 12),
-                      child: Icon(
-                        Icons.search_rounded,
-                        size: 20,
-                        color: AppColors.textMuted,
-                      ),
+                      child: Icon(Icons.search_rounded,
+                          size: 20, color: AppColors.textMuted),
                     ),
                     Expanded(
                       child: TextField(
                         controller: _ctrl,
                         focusNode: _focusNode,
-                        onChanged: (v) => setState(() => _query = v),
+                        onChanged: _onQueryChanged,
                         textAlignVertical: TextAlignVertical.center,
-                        style: AppTextStyles.body
-                            .copyWith(color: AppColors.textLight),
+                        style: AppTextStyles.body.copyWith(color: AppColors.textLight),
                         decoration: InputDecoration(
-                          hintText: 'Search destinations, hotels...',
-                          hintStyle: AppTextStyles.body
-                              .copyWith(color: AppColors.textMuted),
+                          hintText: 'Search places, flights, guides…',
+                          hintStyle: AppTextStyles.body.copyWith(color: AppColors.textMuted),
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
                           focusedBorder: InputBorder.none,
                           isDense: true,
-                          contentPadding:
-                              const EdgeInsets.symmetric(vertical: 0),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 0),
                           filled: false,
                         ),
                         textInputAction: TextInputAction.search,
+                        onSubmitted: (_) => _search(),
                         cursorColor: AppColors.secondary,
                       ),
                     ),
@@ -301,11 +397,8 @@ class _SearchScreenState extends State<SearchScreen> {
                         onTap: _clearSearch,
                         child: const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 10),
-                          child: Icon(
-                            Icons.close_rounded,
-                            size: 18,
-                            color: AppColors.textMuted,
-                          ),
+                          child: Icon(Icons.close_rounded,
+                              size: 18, color: AppColors.textMuted),
                         ),
                       ),
                   ],
@@ -326,11 +419,9 @@ class _SearchScreenState extends State<SearchScreen> {
                     : const Color(0xFFF1F5F9),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
-                Icons.tune_rounded,
-                size: 20,
-                color: _filtersOpen ? Colors.white : AppColors.textMuted,
-              ),
+              child: Icon(Icons.tune_rounded,
+                  size: 20,
+                  color: _filtersOpen ? Colors.white : AppColors.textMuted),
             ),
           ),
         ],
@@ -346,11 +437,8 @@ class _SearchScreenState extends State<SearchScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Divider(
-            height: 1,
-            thickness: 1,
-            color: AppColors.borderLight.withValues(alpha: 0.6),
-          ),
+          Divider(height: 1, thickness: 1,
+              color: AppColors.borderLight.withValues(alpha: 0.6)),
           SizedBox(
             height: 48,
             child: ListView.separated(
@@ -361,13 +449,13 @@ class _SearchScreenState extends State<SearchScreen> {
               itemBuilder: (context, i) {
                 final active = _categories[i] == _category;
                 return GestureDetector(
-                  onTap: () => setState(() => _category = _categories[i]),
+                  onTap: () {
+                    setState(() => _category = _categories[i]);
+                    if (_query.trim().isNotEmpty) _search();
+                  },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 6,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                     decoration: BoxDecoration(
                       color: active ? AppColors.primary : const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(20),
@@ -396,88 +484,42 @@ class _SearchScreenState extends State<SearchScreen> {
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
       child: Column(
-        // FIX: MainAxisSize.min so AnimatedSize can measure the intrinsic height
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Divider(height: 1, color: AppColors.borderLight),
+          const Divider(height: 1, color: AppColors.borderLight),
           const SizedBox(height: 16),
-          // Price range
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Price Range',
-                style: AppTextStyles.label
-                    .copyWith(color: AppColors.primary, fontWeight: FontWeight.w700),
-              ),
-              Text(
-                _priceLabel,
-                style: AppTextStyles.label.copyWith(
-                  color: AppColors.secondary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              activeTrackColor: AppColors.secondary,
-              inactiveTrackColor: AppColors.borderLight,
-              thumbColor: AppColors.primary,
-              overlayColor: AppColors.secondary.withValues(alpha: 0.12),
-              trackHeight: 3,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-              rangeThumbShape:
-                  const RoundRangeSliderThumbShape(enabledThumbRadius: 7),
-            ),
-            child: RangeSlider(
-              values: _priceRange,
-              min: 0,
-              max: 2000,
-              divisions: 40,
-              onChanged: (v) => setState(() => _priceRange = v),
-            ),
-          ),
-          const SizedBox(height: 8),
-          // Minimum rating
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Minimum Rating',
-                style: AppTextStyles.label
-                    .copyWith(color: AppColors.primary, fontWeight: FontWeight.w700),
-              ),
+              Text('Minimum Rating',
+                  style: AppTextStyles.label.copyWith(
+                      color: AppColors.primary, fontWeight: FontWeight.w700)),
               if (_minRating > 0)
                 GestureDetector(
-                  onTap: () => setState(() => _minRating = 0),
-                  child: Text(
-                    'Clear',
-                    style: AppTextStyles.label.copyWith(
-                      color: AppColors.secondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  onTap: () { setState(() => _minRating = 0); if (_query.trim().isNotEmpty) _search(); },
+                  child: Text('Clear',
+                      style: AppTextStyles.label.copyWith(
+                          color: AppColors.secondary, fontWeight: FontWeight.w600)),
                 ),
             ],
           ),
           const SizedBox(height: 10),
           Row(
             children: List.generate(5, (i) {
-              final star = i + 1;
+              final star   = i + 1;
               final filled = star <= _minRating;
               return GestureDetector(
-                onTap: () =>
-                    setState(() => _minRating = _minRating == star ? 0 : star),
+                onTap: () {
+                  setState(() => _minRating = _minRating == star ? 0 : star);
+                  if (_query.trim().isNotEmpty) _search();
+                },
                 child: Padding(
                   padding: const EdgeInsets.only(right: 6),
                   child: Icon(
                     filled ? Icons.star_rounded : Icons.star_outline_rounded,
                     size: 28,
-                    color: filled
-                        ? AppColors.warning
-                        : AppColors.borderLight,
+                    color: filled ? AppColors.warning : AppColors.borderLight,
                   ),
                 ),
               );
@@ -496,13 +538,10 @@ class _SearchScreenState extends State<SearchScreen> {
                 minimumSize: Size.zero,
                 padding: EdgeInsets.zero,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
+                    borderRadius: BorderRadius.circular(10)),
               ),
-              child: Text(
-                'Apply Filters',
-                style: AppTextStyles.btnSm.copyWith(color: Colors.white),
-              ),
+              child: Text('Apply Filters',
+                  style: AppTextStyles.btnSm.copyWith(color: Colors.white)),
             ),
           ),
         ],
@@ -513,13 +552,36 @@ class _SearchScreenState extends State<SearchScreen> {
   // ─── Body ─────────────────────────────────────────────────────────────────
 
   Widget _buildBody() {
-    if (_query.trim().isEmpty) return _buildIdleWatermark();
-    final results = _results;
-    if (results.isEmpty) return _buildNoResultsWatermark();
-    return _buildResultsList(results);
+    if (_query.trim().isEmpty) return _buildIdleView();
+    if (_loading) {
+      return const Center(
+        child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation(AppColors.secondary),
+            strokeWidth: 2.5),
+      );
+    }
+    if (_searchError != null) {
+      return Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.wifi_off_rounded, size: 48, color: AppColors.textMuted),
+          const SizedBox(height: 12),
+          Text(_searchError!,
+              style: AppTextStyles.bodySm.copyWith(color: AppColors.textMuted)),
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: _search,
+            child: Text('Retry',
+                style: AppTextStyles.label.copyWith(
+                    color: AppColors.secondary, fontWeight: FontWeight.w700)),
+          ),
+        ]),
+      );
+    }
+    if (_results.isEmpty) return _buildNoResultsView();
+    return _buildResultsList();
   }
 
-  Widget _buildIdleWatermark() {
+  Widget _buildIdleView() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -533,25 +595,18 @@ class _SearchScreenState extends State<SearchScreen> {
                 color: Color(0xFFE0F2FE),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.travel_explore_rounded,
-                size: 48,
-                color: AppColors.secondary,
-              ),
+              child: const Icon(Icons.travel_explore_rounded,
+                  size: 48, color: AppColors.secondary),
             ),
             const SizedBox(height: 22),
-            Text(
-              'Explore TravelMeta',
-              style: AppTextStyles.h4.copyWith(color: AppColors.primary),
-            ),
+            Text('Explore TravelMeta',
+                style: AppTextStyles.h4.copyWith(color: AppColors.primary)),
             const SizedBox(height: 10),
             Text(
-              'Search for destinations, hotels, flights, bus routes and travel packages.',
+              'Search places, packages, flights,\nbus, train routes and tour guides.',
               textAlign: TextAlign.center,
-              style: AppTextStyles.bodySm.copyWith(
-                color: AppColors.textMuted,
-                height: 1.6,
-              ),
+              style: AppTextStyles.bodySm
+                  .copyWith(color: AppColors.textMuted, height: 1.6),
             ),
             const SizedBox(height: 28),
             Wrap(
@@ -559,13 +614,11 @@ class _SearchScreenState extends State<SearchScreen> {
               runSpacing: 8,
               alignment: WrapAlignment.center,
               children: [
-                _SuggestionChip('Bali', onTap: () => _setQuery('Bali')),
-                _SuggestionChip('Kyoto', onTap: () => _setQuery('Kyoto')),
-                _SuggestionChip('Dubai Hotel',
-                    onTap: () => _setQuery('Dubai Hotel')),
-                _SuggestionChip('Paris', onTap: () => _setQuery('Paris')),
-                _SuggestionChip('Maldives',
-                    onTap: () => _setQuery('Maldives')),
+                _SuggestionChip('Cox\'s Bazar', onTap: () => _setQuery("Cox's Bazar")),
+                _SuggestionChip('Sylhet',       onTap: () => _setQuery('Sylhet')),
+                _SuggestionChip('Dhaka',        onTap: () => _setQuery('Dhaka')),
+                _SuggestionChip('Bandarban',    onTap: () => _setQuery('Bandarban')),
+                _SuggestionChip('Sundarbans',   onTap: () => _setQuery('Sundarbans')),
               ],
             ),
           ],
@@ -574,7 +627,7 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildNoResultsWatermark() {
+  Widget _buildNoResultsView() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -588,25 +641,18 @@ class _SearchScreenState extends State<SearchScreen> {
                 color: AppColors.error.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.search_off_rounded,
-                size: 48,
-                color: AppColors.error,
-              ),
+              child: const Icon(Icons.search_off_rounded,
+                  size: 48, color: AppColors.error),
             ),
             const SizedBox(height: 22),
-            Text(
-              'No results found',
-              style: AppTextStyles.h4.copyWith(color: AppColors.primary),
-            ),
+            Text('No results found',
+                style: AppTextStyles.h4.copyWith(color: AppColors.primary)),
             const SizedBox(height: 10),
             RichText(
               textAlign: TextAlign.center,
               text: TextSpan(
-                style: AppTextStyles.bodySm.copyWith(
-                  color: AppColors.textMuted,
-                  height: 1.6,
-                ),
+                style: AppTextStyles.bodySm
+                    .copyWith(color: AppColors.textMuted, height: 1.6),
                 children: [
                   const TextSpan(text: 'No matches for '),
                   TextSpan(
@@ -617,10 +663,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       fontFamily: AppTextStyles.bodySm.fontFamily,
                     ),
                   ),
-                  const TextSpan(
-                    text:
-                        '.\nTry different keywords or adjust your filters.',
-                  ),
+                  const TextSpan(text: '.\nTry different keywords or another category.'),
                 ],
               ),
             ),
@@ -628,19 +671,11 @@ class _SearchScreenState extends State<SearchScreen> {
             GestureDetector(
               onTap: () {
                 _clearSearch();
-                setState(() {
-                  _category = 'All';
-                  _priceRange = const RangeValues(0, 2000);
-                  _minRating = 0;
-                });
+                setState(() { _category = 'All'; _minRating = 0; });
               },
-              child: Text(
-                'Clear search & filters',
-                style: AppTextStyles.label.copyWith(
-                  color: AppColors.secondary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              child: Text('Clear search & filters',
+                  style: AppTextStyles.label.copyWith(
+                      color: AppColors.secondary, fontWeight: FontWeight.w700)),
             ),
           ],
         ),
@@ -648,12 +683,15 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildResultsList(List<_SearchItem> items) {
+  Widget _buildResultsList() {
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
-      itemCount: items.length,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+      itemCount: _results.length,
       separatorBuilder: (context, index) => const SizedBox(height: 10),
-      itemBuilder: (context, i) => _ResultCard(item: items[i]),
+      itemBuilder: (context, i) => _ResultCard(
+        result: _results[i],
+        onTap: () => _onResultTap(_results[i]),
+      ),
     );
   }
 }
@@ -663,7 +701,6 @@ class _SearchScreenState extends State<SearchScreen> {
 class _SuggestionChip extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
-
   const _SuggestionChip(this.label, {this.onTap});
 
   @override
@@ -677,29 +714,17 @@ class _SuggestionChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: AppColors.borderLight),
           boxShadow: const [
-            BoxShadow(
-              color: AppColors.shadow,
-              blurRadius: 6,
-              offset: Offset(0, 2),
-            ),
+            BoxShadow(color: AppColors.shadow, blurRadius: 6, offset: Offset(0, 2)),
           ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.north_west_rounded,
-              size: 12,
-              color: AppColors.textMuted,
-            ),
+            const Icon(Icons.north_west_rounded, size: 12, color: AppColors.textMuted),
             const SizedBox(width: 5),
-            Text(
-              label,
-              style: AppTextStyles.labelSm.copyWith(
-                color: AppColors.textLight,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            Text(label,
+                style: AppTextStyles.labelSm.copyWith(
+                    color: AppColors.textLight, fontWeight: FontWeight.w600)),
           ],
         ),
       ),
@@ -708,51 +733,40 @@ class _SuggestionChip extends StatelessWidget {
 }
 
 class _ResultCard extends StatelessWidget {
-  final _SearchItem item;
-  const _ResultCard({required this.item});
+  final _SearchResult result;
+  final VoidCallback onTap;
+  const _ResultCard({required this.result, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    final r = result;
     return GestureDetector(
-      onTap: () {},
+      onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: AppColors.borderLight),
           boxShadow: const [
-            BoxShadow(
-              color: AppColors.shadow,
-              blurRadius: 10,
-              offset: Offset(0, 3),
-            ),
+            BoxShadow(color: AppColors.shadow, blurRadius: 10, offset: Offset(0, 3)),
           ],
         ),
         child: Row(
           children: [
-            // Image thumbnail
+            // Icon thumbnail
             ClipRRect(
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(13),
                 bottomLeft: Radius.circular(13),
               ),
               child: Container(
-                width: 90,
-                height: 90,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: item.gradientColors,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: Icon(
-                  item.icon,
-                  size: 36,
-                  color: Colors.white.withValues(alpha: 0.4),
-                ),
+                width: 84,
+                height: 84,
+                color: r.color.withValues(alpha: 0.12),
+                child: Icon(r.icon, size: 34, color: r.color),
               ),
             ),
+
             // Info
             Expanded(
               child: Padding(
@@ -765,11 +779,10 @@ class _ResultCard extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            item.name,
+                            r.title,
                             style: AppTextStyles.body.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primary,
-                            ),
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -777,59 +790,56 @@ class _ResultCard extends StatelessWidget {
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 2,
-                          ),
+                              horizontal: 7, vertical: 2),
                           decoration: BoxDecoration(
-                            color: AppColors.secondary.withValues(alpha: 0.10),
+                            color: r.color.withValues(alpha: 0.10),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            item.category,
+                            r.category,
                             style: AppTextStyles.labelSm.copyWith(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.secondary,
-                              letterSpacing: 0.3,
-                            ),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: r.color,
+                                letterSpacing: 0.3),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      item.subtitle,
-                      style: AppTextStyles.labelSm.copyWith(
-                        color: AppColors.textMuted,
-                        height: 1.4,
+                    if (r.subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        r.subtitle,
+                        style: AppTextStyles.labelSm
+                            .copyWith(color: AppColors.textMuted, height: 1.4),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    ],
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        const Icon(
-                          Icons.star_rounded,
-                          size: 13,
-                          color: AppColors.warning,
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          item.rating.toStringAsFixed(1),
-                          style: AppTextStyles.captionMd
-                              .copyWith(color: AppColors.primary),
-                        ),
+                        if (r.rating != null) ...[
+                          const Icon(Icons.star_rounded,
+                              size: 13, color: AppColors.warning),
+                          const SizedBox(width: 3),
+                          Text(
+                            r.rating!.toStringAsFixed(1),
+                            style: AppTextStyles.captionMd
+                                .copyWith(color: AppColors.primary),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
                         const Spacer(),
-                        Text(
-                          'from ',
-                          style: AppTextStyles.caption,
-                        ),
-                        Text(
-                          '\$${item.price}',
-                          style: AppTextStyles.price
-                              .copyWith(color: AppColors.secondary),
-                        ),
+                        if (r.priceStr != null)
+                          Text(
+                            r.priceStr!,
+                            style: AppTextStyles.priceSm
+                                .copyWith(color: r.color),
+                          ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.arrow_forward_ios_rounded,
+                            size: 12, color: AppColors.textMuted),
                       ],
                     ),
                   ],
