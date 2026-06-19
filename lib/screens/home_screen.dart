@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/supabase_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
+import 'search_screen.dart';
 import 'service_screens.dart';
+import 'services/package_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -60,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 22),
           _buildFlashDeal(),
           const SizedBox(height: 22),
-          _buildRecommended(),
+          const _HomePackagesSection(),
           const SizedBox(height: 22),
           _buildExclusiveDeals(),
           const SizedBox(height: 22),
@@ -100,7 +103,13 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: AppSpacing.xl),
-          _buildHomeSearchBar(),
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SearchScreen()),
+            ),
+            child: AbsorbPointer(child: _buildHomeSearchBar()),
+          ),
         ],
       ),
     );
@@ -346,53 +355,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  // ─── Recommended for you ─────────────────────────────────────────────────
-
-  Widget _buildRecommended() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionHeader(title: 'Recommended for You', onViewAll: () {}),
-        const SizedBox(height: AppSpacing.md),
-        SizedBox(
-          height: 216,
-          child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
-            scrollDirection: Axis.horizontal,
-            children: const [
-              _RecommendedCard(
-                title: 'Ubud Nature Villa',
-                location: 'Bali, Indonesia',
-                price: r'$240',
-                rating: '4.9',
-                gradientColors: [Color(0xFF166534), Color(0xFF4ADE80)],
-                icon: Icons.forest_rounded,
-              ),
-              SizedBox(width: 14),
-              _RecommendedCard(
-                title: 'Marina Bay Suite',
-                location: 'Dubai, UAE',
-                price: r'$350',
-                rating: '4.7',
-                gradientColors: [Color(0xFF0C4A6E), Color(0xFF38BDF8)],
-                icon: Icons.location_city_rounded,
-              ),
-              SizedBox(width: 14),
-              _RecommendedCard(
-                title: 'Kyoto Ryokan',
-                location: 'Kyoto, Japan',
-                price: r'$280',
-                rating: '4.8',
-                gradientColors: [Color(0xFF831843), Color(0xFFF472B6)],
-                icon: Icons.temple_buddhist_rounded,
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 
@@ -699,160 +661,6 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _RecommendedCard extends StatelessWidget {
-  final String title;
-  final String location;
-  final String price;
-  final String rating;
-  final List<Color> gradientColors;
-  final IconData icon;
-
-  const _RecommendedCard({
-    required this.title,
-    required this.location,
-    required this.price,
-    required this.rating,
-    required this.gradientColors,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {},
-      child: Container(
-        width: 162,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.borderLight),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x0A0A2540),
-              blurRadius: 10,
-              offset: Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(13),
-                    topRight: Radius.circular(13),
-                  ),
-                  child: Container(
-                    height: 120,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: gradientColors,
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    child: Icon(
-                      icon,
-                      size: 52,
-                      color: Colors.white.withValues(alpha: 0.35),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: AppSpacing.sm,
-                  right: AppSpacing.sm,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.star_rounded,
-                          size: 12,
-                          color: Color(0xFFFBBF24),
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          rating,
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    location,
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      color: AppColors.textMuted,
-                    ),
-                  ),
-                  const SizedBox(height: 7),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        price,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.secondary,
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 1),
-                        child: Text(
-                          '/night',
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            color: const Color(0xFF94A3B8),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _DestinationCard extends StatelessWidget {
   final String name;
   final String country;
@@ -936,4 +744,286 @@ class _DestinationCard extends StatelessWidget {
       ),
     );
   }
+}
+
+// ─── Recommended packages section ─────────────────────────────────────────────
+
+class _HomePackagesSection extends StatefulWidget {
+  const _HomePackagesSection();
+
+  @override
+  State<_HomePackagesSection> createState() => _HomePackagesSectionState();
+}
+
+class _HomePackagesSectionState extends State<_HomePackagesSection> {
+  List<TravelPackage> _packages = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final data = await supabase
+          .from('packages')
+          .select('*, agencies(*)')
+          .limit(4);
+      if (mounted) {
+        setState(() {
+          _packages = (data as List)
+              .map((e) => TravelPackage.fromJson(Map<String, dynamic>.from(e as Map)))
+              .toList();
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionHeader(
+          title: 'Recommended for You',
+          onViewAll: () => ServiceNav.navigateTo(context, 5),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        SizedBox(
+          height: 236,
+          child: _loading
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.secondary,
+                    strokeWidth: 2.5,
+                  ),
+                )
+              : _packages.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No packages available',
+                        style: GoogleFonts.inter(
+                            fontSize: 13, color: AppColors.textMuted),
+                      ),
+                    )
+                  : PageView.builder(
+                      controller: PageController(viewportFraction: 0.78),
+                      padEnds: false,
+                      itemCount: _packages.length,
+                      itemBuilder: (_, i) => Padding(
+                        padding: EdgeInsets.only(
+                          left: i == 0 ? AppSpacing.pagePadding : 8,
+                          right: i == _packages.length - 1
+                              ? AppSpacing.pagePadding
+                              : 0,
+                        ),
+                        child: _HomePackageCard(
+                          package: _packages[i],
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  PackageDetailScreen(package: _packages[i]),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HomePackageCard extends StatelessWidget {
+  final TravelPackage package;
+  final VoidCallback onTap;
+  const _HomePackageCard({required this.package, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final pkg = package;
+    final color = _catColor(pkg.category);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x120A2540),
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Hero ────────────────────────────────────────────────────
+            ClipRRect(
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(16)),
+              child: SizedBox(
+                height: 130,
+                width: double.infinity,
+                child: Stack(fit: StackFit.expand, children: [
+                  if (pkg.heroUrl != null)
+                    Image.network(
+                      pkg.heroUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (ctx, e, s) => _GradFallback(color: color),
+                    )
+                  else
+                    _GradFallback(color: color),
+                  // Rating badge
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.star_rounded,
+                            size: 11, color: Color(0xFFFBBF24)),
+                        const SizedBox(width: 3),
+                        Text(
+                          pkg.rating.toStringAsFixed(1),
+                          style: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white),
+                        ),
+                      ]),
+                    ),
+                  ),
+                  // Duration badge
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        pkg.duration,
+                        style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+
+            // ── Info ────────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    pkg.title,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    pkg.agencyName,
+                    style: GoogleFonts.inter(
+                        fontSize: 11, color: AppColors.textMuted),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${pkg.currency} ${pkg.formattedPrice}',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: color,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          pkg.category,
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: color,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _catColor(String cat) {
+    switch (cat.toLowerCase()) {
+      case 'beach':      return AppColors.secondary;
+      case 'adventure':  return AppColors.error;
+      case 'cultural':   return AppColors.warning;
+      case 'wildlife':   return AppColors.success;
+      case 'hill track': return AppColors.primary;
+      default:           return AppColors.success;
+    }
+  }
+}
+
+class _GradFallback extends StatelessWidget {
+  final Color color;
+  const _GradFallback({required this.color});
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              color.withValues(alpha: 0.30),
+              color.withValues(alpha: 0.10),
+            ],
+          ),
+        ),
+        child: Center(
+          child: Icon(Icons.luggage_rounded,
+              size: 48, color: color.withValues(alpha: 0.45)),
+        ),
+      );
 }

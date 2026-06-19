@@ -4,6 +4,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../login_screen.dart';
 import 'profile_details_screen.dart';
+import '../payment_folder/payment_history_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -165,7 +166,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       label: 'Payment History',
                       subtitle: 'View past transactions',
                       color: AppColors.success,
-                      onTap: () => _showComingSoon('Payment History'),
+                      onTap: () => Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => const PaymentHistoryScreen())),
                     ),
                   ]),
 

@@ -4,6 +4,33 @@ import '../services/supabase_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 
+String resolveSpotImage(dynamic rawImages) {
+  if (rawImages == null) return '';
+
+  // `images` is a jsonb array — grab the first entry.
+  String? first;
+  if (rawImages is List && rawImages.isNotEmpty) {
+    first = rawImages.first?.toString();
+  } else if (rawImages is String && rawImages.isNotEmpty) {
+    first = rawImages; // fallback if it ever arrives as a plain string
+  }
+  if (first == null || first.isEmpty) return '';
+
+  // Already a full URL? Use it directly.
+  if (first.startsWith('http')) return first;
+
+  // Otherwise it's a storage path. The first segment is the bucket,
+  // everything after it is the object key.
+  final slash = first.indexOf('/');
+  if (slash == -1) {
+    // No folder prefix (e.g. "boga-lake-1.jpg") -> assume tourist-spots bucket.
+    return supabase.storage.from('tourist-spots').getPublicUrl(first);
+  }
+  final bucket = first.substring(0, slash); // "tourist-spots"
+  final key = first.substring(slash + 1);   // "nilgiri-1.jpeg"
+  return supabase.storage.from(bucket).getPublicUrl(key);
+}
+
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
   @override
@@ -259,7 +286,7 @@ class _SpotCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = spot['image_url']?.toString() ?? spot['image']?.toString() ?? '';
+    final imageUrl = resolveSpotImage(spot['images']);
     final name = spot['name']?.toString() ?? spot['spot_name']?.toString() ?? 'Unknown';
     final city = spot['city']?.toString() ?? spot['location']?.toString() ?? '';
     final category = spot['category']?.toString() ?? '';
@@ -376,7 +403,7 @@ class _SpotDetailSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = spot['image_url']?.toString() ?? spot['image']?.toString() ?? '';
+    final imageUrl = resolveSpotImage(spot['images']);
     final name = spot['name']?.toString() ?? spot['spot_name']?.toString() ?? 'Unknown';
     final city = spot['city']?.toString() ?? spot['location']?.toString() ?? '';
     final description =
