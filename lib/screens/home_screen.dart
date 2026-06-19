@@ -7,6 +7,7 @@ import '../theme/app_spacing.dart';
 import 'search_screen.dart';
 import 'service_screens.dart';
 import 'services/package_detail_screen.dart';
+import 'explore_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -67,7 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 22),
           _buildExclusiveDeals(),
           const SizedBox(height: 22),
-          _buildTopDestinations(),
+          const _TopDestinationsSection(),
           const SizedBox(height: 30),
         ],
       ),
@@ -496,41 +497,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ─── Top destinations ─────────────────────────────────────────────────────
-
-  Widget _buildTopDestinations() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionHeader(title: 'Top Destinations', onViewAll: () {}),
-        const SizedBox(height: AppSpacing.md),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
-          child: Row(
-            children: const [
-              Expanded(
-                child: _DestinationCard(
-                  name: 'Kyoto',
-                  country: 'Japan',
-                  gradientColors: [Color(0xFF831843), Color(0xFFF9A8D4)],
-                  icon: Icons.temple_buddhist_rounded,
-                ),
-              ),
-              SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: _DestinationCard(
-                  name: 'Paris',
-                  country: 'France',
-                  gradientColors: [Color(0xFF1E3A5F), Color(0xFF93C5FD)],
-                  icon: Icons.location_city_rounded,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 // ─── Sub-widgets ──────────────────────────────────────────────────────────────
@@ -661,61 +627,312 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _DestinationCard extends StatelessWidget {
-  final String name;
-  final String country;
-  final List<Color> gradientColors;
-  final IconData icon;
+// ─── Top Destinations (live carousel) ────────────────────────────────────────
 
-  const _DestinationCard({
-    required this.name,
-    required this.country,
-    required this.gradientColors,
-    required this.icon,
+class _TopDestinationsSection extends StatefulWidget {
+  const _TopDestinationsSection();
+
+  @override
+  State<_TopDestinationsSection> createState() =>
+      _TopDestinationsSectionState();
+}
+
+class _TopDestinationsSectionState extends State<_TopDestinationsSection> {
+  List<Map<String, dynamic>> _spots = [];
+  bool _loading = true;
+  String? _error;
+  late final PageController _ctrl;
+  int _page = 0;
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = PageController(viewportFraction: 0.82);
+    _ctrl.addListener(() {
+      final p = _ctrl.page?.round() ?? 0;
+      if (p != _page && mounted) setState(() => _page = p);
+    });
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (mounted) setState(() { _loading = true; _error = null; });
+    try {
+      final data = await supabase
+          .from('tourist_spots')
+          .select('*')
+          .order('name', ascending: true)
+          .limit(4);
+      if (mounted) {
+        setState(() {
+          _spots = List<Map<String, dynamic>>.from(data as List);
+          _loading = false;
+        });
+        _startTicker();
+      }
+    } catch (e) {
+      if (mounted) setState(() { _loading = false; _error = e.toString(); });
+    }
+  }
+
+  void _startTicker() {
+    _ticker?.cancel();
+    if (_spots.length <= 1) return;
+    _ticker = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!mounted || !_ctrl.hasClients) return;
+      final next = (_page + 1) % _spots.length;
+      _ctrl.animateToPage(
+        next,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _goToExplore() {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, anim, anim2) => const ExploreScreen(),
+        transitionsBuilder: (context, animation, secAnim, child) {
+          final curved = CurvedAnimation(
+              parent: animation, curve: Curves.easeOutCubic);
+          return FadeTransition(
+            opacity: curved,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.06),
+                end: Offset.zero,
+              ).animate(curved),
+              child: child,
+            ),
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 420),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionHeader(title: 'Top Destinations', onViewAll: _goToExplore),
+        const SizedBox(height: AppSpacing.md),
+        SizedBox(
+          height: 180,
+          child: _loading
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.secondary,
+                    strokeWidth: 2.5,
+                  ),
+                )
+              : _error != null
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Could not load destinations',
+                            style: GoogleFonts.inter(
+                                fontSize: 13, color: AppColors.textMuted),
+                          ),
+                          const SizedBox(height: 8),
+                          GestureDetector(
+                            onTap: _load,
+                            child: Text(
+                              'Tap to retry',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: AppColors.secondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+              : _spots.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No destinations available',
+                        style: GoogleFonts.inter(
+                            fontSize: 13, color: AppColors.textMuted),
+                      ),
+                    )
+                  : PageView.builder(
+                      controller: _ctrl,
+                      itemCount: _spots.length,
+                      itemBuilder: (_, i) => _DestSlide(
+                        spot: _spots[i],
+                        isFirst: i == 0,
+                        isLast: i == _spots.length - 1,
+                        onTap: _goToExplore,
+                      ),
+                    ),
+        ),
+        if (!_loading && _spots.length > 1) ...[
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(
+              _spots.length,
+              (i) => AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                width: i == _page ? 20 : 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: i == _page
+                      ? AppColors.secondary
+                      : AppColors.borderLight,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _DestSlide extends StatelessWidget {
+  final Map<String, dynamic> spot;
+  final bool isFirst;
+  final bool isLast;
+  final VoidCallback onTap;
+
+  const _DestSlide({
+    required this.spot,
+    required this.isFirst,
+    required this.isLast,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final imageUrl = resolveSpotImage(spot['images']);
+    final name = spot['name']?.toString() ??
+        spot['spot_name']?.toString() ??
+        'Unknown';
+    final city =
+        spot['city']?.toString() ?? spot['location']?.toString() ?? '';
+    final category = spot['category']?.toString() ?? '';
+    final rating = (spot['rating'] as num?)?.toDouble();
+
     return GestureDetector(
-      onTap: () {},
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: SizedBox(
-          height: 140,
+      onTap: onTap,
+      child: Container(
+        margin: EdgeInsets.only(
+          left: isFirst ? AppSpacing.pagePadding : AppSpacing.sm,
+          right: isLast ? AppSpacing.pagePadding : 0,
+        ),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: const [
+            BoxShadow(
+                color: AppColors.shadow,
+                blurRadius: 12,
+                offset: Offset(0, 4)),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Container(
+              // Background image
+              imageUrl.isNotEmpty
+                  ? Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, err, stack) => const _DestFallback(),
+                    )
+                  : const _DestFallback(),
+
+              // Bottom gradient overlay
+              const DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: gradientColors,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-              ),
-              Center(
-                child: Icon(
-                  icon,
-                  size: 64,
-                  color: Colors.white.withValues(alpha: 0.20),
-                ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.55),
-                    ],
+                    colors: [Colors.transparent, Color(0xCC000000)],
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
+                    stops: [0.35, 1.0],
                   ),
                 ),
               ),
+
+              // Top: rating + category badges
               Positioned(
-                left: AppSpacing.md,
-                bottom: AppSpacing.md,
+                top: 10,
+                left: 10,
+                right: 10,
+                child: Row(
+                  children: [
+                    if (rating != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.star_rounded,
+                                size: 11, color: Color(0xFFFBBF24)),
+                            const SizedBox(width: 3),
+                            Text(
+                              rating.toStringAsFixed(1),
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    const Spacer(),
+                    if (category.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.secondary.withValues(alpha: 0.85),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          category,
+                          style: GoogleFonts.inter(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+              // Bottom: name + city
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: 12,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -725,16 +942,29 @@ class _DestinationCard extends StatelessWidget {
                         fontSize: 17,
                         fontWeight: FontWeight.w800,
                         color: Colors.white,
+                        letterSpacing: -0.3,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    Text(
-                      country,
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        color: Colors.white.withValues(alpha: 0.85),
-                        fontWeight: FontWeight.w500,
+                    if (city.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on_rounded,
+                              size: 11, color: Colors.white70),
+                          const SizedBox(width: 3),
+                          Text(
+                            city,
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: Colors.white.withValues(alpha: 0.85),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -744,6 +974,26 @@ class _DestinationCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DestFallback extends StatelessWidget {
+  const _DestFallback();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [AppColors.primary, AppColors.secondary],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Icon(
+          Icons.landscape_rounded,
+          size: 56,
+          color: Colors.white.withValues(alpha: 0.20),
+        ),
+      );
 }
 
 // ─── Recommended packages section ─────────────────────────────────────────────

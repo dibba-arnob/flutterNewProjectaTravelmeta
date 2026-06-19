@@ -103,7 +103,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             expandedHeight: 190,
             pinned: true,
             backgroundColor: AppColors.primary,
-            automaticallyImplyLeading: false,
+            automaticallyImplyLeading: true,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 decoration: const BoxDecoration(

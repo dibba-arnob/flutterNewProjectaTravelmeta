@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/shared_chrome.dart';
-import '../widgets/service_drawer.dart';
 import 'services/flights_screen.dart';
 import 'services/hotels_screen.dart';
 import 'services/bus_screen.dart';
@@ -58,18 +57,11 @@ class _ServicePage extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: TmAppBar(
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu_rounded),
-            color: AppColors.primary,
-            tooltip: 'Open menu',
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.primary),
+          tooltip: 'Back',
+          onPressed: () => Navigator.pop(context),
         ),
-      ),
-      drawer: ServiceDrawer(
-        currentIndex: index,
-        onNavigate: (i) => ServiceNav.replaceTo(context, i),
       ),
       body: Column(
         children: [
