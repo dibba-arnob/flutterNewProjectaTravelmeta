@@ -6,7 +6,7 @@ import '../../theme/app_text_styles.dart';
 import 'booking_payload.dart';
 import 'booking_confirmation_screen.dart';
 
-enum _PayMethod { bkash, nagad, card, applePay }
+enum _PayMethod { bkash, nagad, card, applePay, wallet }
 
 String _methodToDb(_PayMethod m) {
   switch (m) {
@@ -14,6 +14,7 @@ String _methodToDb(_PayMethod m) {
     case _PayMethod.nagad:    return 'nagad';
     case _PayMethod.card:     return 'card';
     case _PayMethod.applePay: return 'apple_pay';
+    case _PayMethod.wallet:   return 'wallet';
   }
 }
 
@@ -23,6 +24,7 @@ String _methodName(_PayMethod m) {
     case _PayMethod.nagad:    return 'Nagad';
     case _PayMethod.card:     return 'Credit / Debit Card';
     case _PayMethod.applePay: return 'Apple Pay';
+    case _PayMethod.wallet:   return 'TravelMeta Wallet';
   }
 }
 
@@ -41,9 +43,32 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   _PayMethod _selected = _PayMethod.bkash;
   bool _paying = false;
+  double? _walletBalance;
 
   double get _tax => (widget.payload.baseAmount * 0.15).roundToDouble();
   double get _total => widget.payload.baseAmount + _tax;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWalletBalance();
+  }
+
+  Future<void> _loadWalletBalance() async {
+    final uid = supabase.auth.currentUser?.id;
+    if (uid == null) return;
+    try {
+      final row = await supabase
+          .from('wallets')
+          .select('balance')
+          .eq('user_id', uid)
+          .single();
+      if (mounted) {
+        setState(() =>
+            _walletBalance = (row['balance'] as num?)?.toDouble() ?? 0.0);
+      }
+    } catch (_) {}
+  }
 
   Future<void> _pay() async {
     final user = supabase.auth.currentUser;
@@ -51,6 +76,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _err('Please log in to continue.');
       return;
     }
+
+    if (_selected == _PayMethod.wallet) {
+      final bal = _walletBalance ?? 0.0;
+      if (bal < _total) {
+        _err('Insufficient wallet balance. Please add money to continue.');
+        return;
+      }
+    }
+
     setState(() => _paying = true);
     String? bookingId;
     try {
@@ -72,16 +106,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       bookingId = row['id'] as String;
 
-      await supabase.from('payments').insert({
-        'booking_id': bookingId,
-        'user_id': user.id,
-        'amount': _total,
-        'currency': p.currency,
-        'method': _methodToDb(_selected),
-        'status': 'completed',
-        'gateway_ref': 'GW-${DateTime.now().millisecondsSinceEpoch}',
-      });
-
+      if (_selected == _PayMethod.wallet) {
+        await supabase.rpc('wallet_pay_booking',
+            params: {'p_booking_id': bookingId});
+      } else {
+        await supabase.from('payments').insert({
+          'booking_id': bookingId,
+          'user_id': user.id,
+          'amount': _total,
+          'currency': p.currency,
+          'method': _methodToDb(_selected),
+          'status': 'completed',
+          'gateway_ref': 'GW-${DateTime.now().millisecondsSinceEpoch}',
+        });
+      }
 
       if (mounted) {
         Navigator.pushReplacement(
@@ -99,7 +137,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
     } on PostgrestException catch (e) {
       await _rollback(bookingId);
-      _err(e.message);
+      if (e.message.contains('INSUFFICIENT_BALANCE')) {
+        _err('Insufficient wallet balance. Please add money to continue.');
+      } else {
+        _err(e.message);
+      }
     } catch (_) {
       await _rollback(bookingId);
       _err('Payment failed. Please try again.');
@@ -165,6 +207,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     const SizedBox(height: 14),
                     _PayMethodCard(
                       selected: _selected,
+                      walletBalance: _walletBalance,
                       onChanged: _paying ? null : (m) => setState(() => _selected = m),
                     ),
                     const SizedBox(height: 20),
@@ -452,11 +495,19 @@ class _PR extends StatelessWidget {
 
 class _PayMethodCard extends StatelessWidget {
   final _PayMethod selected;
+  final double? walletBalance;
   final ValueChanged<_PayMethod>? onChanged;
-  const _PayMethodCard({required this.selected, required this.onChanged});
+  const _PayMethodCard(
+      {required this.selected,
+      required this.walletBalance,
+      required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
+    final balanceDesc = walletBalance != null
+        ? 'Balance: ৳ ${walletBalance!.toStringAsFixed(0)}'
+        : 'Pay with your wallet balance';
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -475,16 +526,24 @@ class _PayMethodCard extends StatelessWidget {
                 style: AppTextStyles.h6.copyWith(color: AppColors.primary)),
           ),
           _tile(_PayMethod.bkash, 'bKash', 'Fast & Secure Local Payment',
-              const Color(0xFFE2136E), Icons.account_balance_wallet_rounded, isLast: false),
+              const Color(0xFFE2136E), Icons.account_balance_wallet_rounded,
+              isLast: false),
           _sep(),
           _tile(_PayMethod.nagad, 'Nagad', 'Local Mobile Wallet',
-              const Color(0xFFED5C0D), Icons.wallet_rounded, isLast: false),
+              const Color(0xFFED5C0D), Icons.wallet_rounded,
+              isLast: false),
           _sep(),
           _tile(_PayMethod.card, 'Credit/Debit Card', 'Visa, Mastercard, AMEX',
-              const Color(0xFF1A56DB), Icons.credit_card_rounded, isLast: false),
+              const Color(0xFF1A56DB), Icons.credit_card_rounded,
+              isLast: false),
           _sep(),
           _tile(_PayMethod.applePay, 'Apple Pay', 'Instant Secure Checkout',
-              const Color(0xFF1F2937), Icons.phone_iphone_rounded, isLast: true),
+              const Color(0xFF1F2937), Icons.phone_iphone_rounded,
+              isLast: false),
+          _sep(),
+          _tile(_PayMethod.wallet, 'From my Wallet', balanceDesc,
+              AppColors.secondary, Icons.account_balance_rounded,
+              isLast: true),
         ],
       ),
     );

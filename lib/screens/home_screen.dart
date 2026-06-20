@@ -79,7 +79,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildWelcomeSection() {
     return Container(
-      color: Colors.white,
+      decoration: BoxDecoration(
+        image: DecorationImage(
+          image: const AssetImage('lib/images/home_topbar.jpeg'),
+          fit: BoxFit.cover,
+          colorFilter: ColorFilter.mode(
+            Colors.black.withValues(alpha: 0.45),
+            BlendMode.darken,
+          ),
+        ),
+      ),
       padding: const EdgeInsets.all(AppSpacing.xl),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -89,7 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
             style: GoogleFonts.inter(
               fontSize: 11,
               fontWeight: FontWeight.w700,
-              color: AppColors.secondary,
+              color: Colors.white70,
               letterSpacing: 2.0,
             ),
           ),
@@ -99,7 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
             style: GoogleFonts.plusJakartaSans(
               fontSize: 28,
               fontWeight: FontWeight.w800,
-              color: AppColors.primary,
+              color: Colors.white,
               letterSpacing: -0.5,
             ),
           ),

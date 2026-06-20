@@ -189,23 +189,11 @@ class _SplashScreenState extends State<SplashScreen>
 class _CoastalBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF7B9EB8), // cloudy sky
-            Color(0xFF6A8DA8), // sky midtone
-            Color(0xFF4F7D93), // lower sky
-            Color(0xFF3A6B7C), // horizon
-            Color(0xFF1E5063), // water surface
-            Color(0xFF123E50), // deep water
-            Color(0xFF0A2B3A), // foreground
-          ],
-          stops: [0.0, 0.18, 0.35, 0.47, 0.62, 0.80, 1.0],
-        ),
-      ),
+    return Image.asset(
+      'lib/images/flashscreen.jpeg',
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
     );
   }
 }
