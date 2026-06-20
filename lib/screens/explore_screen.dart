@@ -1,8 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+
+// Fallback coordinates for popular Bangladesh cities
+const _cityLatLng = <String, LatLng>{
+  "cox's bazar": LatLng(21.4272, 92.0058),
+  'dhaka':       LatLng(23.8103, 90.4125),
+  'sylhet':      LatLng(24.8949, 91.8687),
+  'chittagong':  LatLng(22.3569, 91.7832),
+  'bandarban':   LatLng(22.1953, 92.2184),
+  'rangamati':   LatLng(22.6480, 92.2018),
+  'sundarbans':  LatLng(21.9497, 89.1833),
+  'sreemangal':  LatLng(24.3079, 91.7323),
+  'khulna':      LatLng(22.8456, 89.5403),
+  'rajshahi':    LatLng(24.3745, 88.6042),
+  'mymensingh':  LatLng(24.7471, 90.4203),
+};
+
+LatLng? _resolveLatLng(Map<String, dynamic> spot) {
+  final lat = (spot['latitude'] as num?)?.toDouble();
+  final lng = (spot['longitude'] as num?)?.toDouble();
+  if (lat != null && lng != null) return LatLng(lat, lng);
+  final city = (spot['city'] ?? spot['location'] ?? '').toString().toLowerCase().trim();
+  return _cityLatLng[city];
+}
 
 String resolveSpotImage(dynamic rawImages) {
   if (rawImages == null) return '';
@@ -410,10 +435,11 @@ class _SpotDetailSheet extends StatelessWidget {
         spot['description']?.toString() ?? spot['about']?.toString() ?? '';
     final category = spot['category']?.toString() ?? '';
     final rating = (spot['rating'] as num?)?.toDouble();
+    final coords = _resolveLatLng(spot);
 
     return DraggableScrollableSheet(
-      initialChildSize: 0.78,
-      maxChildSize: 0.95,
+      initialChildSize: 0.85,
+      maxChildSize: 0.97,
       minChildSize: 0.45,
       builder: (_, scrollCtrl) => Container(
         decoration: const BoxDecoration(
@@ -437,21 +463,21 @@ class _SpotDetailSheet extends StatelessWidget {
               ),
             ),
 
-            // Image
+            // Photo
             if (imageUrl.isNotEmpty)
               Image.network(
                 imageUrl,
-                height: 220,
+                height: 200,
                 width: double.infinity,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stack) => _PlaceholderImage(height: 220),
+                errorBuilder: (context, error, stack) => _PlaceholderImage(height: 200),
               )
             else
-              _PlaceholderImage(height: 220),
+              _PlaceholderImage(height: 200),
 
             // Details
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -494,12 +520,11 @@ class _SpotDetailSheet extends StatelessWidget {
                       ),
                   ]),
                   if (description.isNotEmpty) ...[
-                    const SizedBox(height: 18),
-                    const Divider(color: AppColors.borderLight),
                     const SizedBox(height: 14),
+                    const Divider(color: AppColors.borderLight),
+                    const SizedBox(height: 12),
                     Text('About',
-                        style:
-                            AppTextStyles.h6.copyWith(color: AppColors.primary)),
+                        style: AppTextStyles.h6.copyWith(color: AppColors.primary)),
                     const SizedBox(height: 8),
                     Text(description,
                         style: AppTextStyles.body.copyWith(
@@ -508,7 +533,94 @@ class _SpotDetailSheet extends StatelessWidget {
                 ],
               ),
             ),
+
+            // ── Map panel ────────────────────────────────────────
+            if (coords != null) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
+                child: Row(children: [
+                  const Icon(Icons.map_rounded, size: 16, color: AppColors.primary),
+                  const SizedBox(width: 6),
+                  Text('Location',
+                      style: AppTextStyles.h6.copyWith(color: AppColors.primary)),
+                ]),
+              ),
+              _MapPanel(coords: coords, label: name),
+            ],
+
+            const SizedBox(height: 32),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Interactive map panel (OpenStreetMap — no API key needed) ───────────────
+
+class _MapPanel extends StatelessWidget {
+  final LatLng coords;
+  final String label;
+  const _MapPanel({required this.coords, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: SizedBox(
+          height: 230,
+          child: FlutterMap(
+            options: MapOptions(
+              initialCenter: coords,
+              initialZoom: 13,
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.travelmeta.app',
+              ),
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: coords,
+                    width: 48,
+                    height: 48,
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondary,
+                            borderRadius: BorderRadius.circular(6),
+                            boxShadow: const [
+                              BoxShadow(
+                                  color: AppColors.shadow,
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2))
+                            ],
+                          ),
+                          child: Text(
+                            label,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 8,
+                                fontWeight: FontWeight.w700),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                        const Icon(Icons.location_pin,
+                            color: AppColors.secondary, size: 28),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
